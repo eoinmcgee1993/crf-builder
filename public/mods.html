@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<title>CRF Garage — Modifications Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#121316; --panel:#1b1d22; --panel-2:#22252b; --line:#2d3037;
+  --text:#eef0f2; --text-dim:#9aa0aa; --accent:#e2231a; --accent-2:#ff8a1e;
+  --success:#3ddc84;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;line-height:1.65;-webkit-font-smoothing:antialiased;}
+a{color:var(--accent-2);}
+.wrap{max-width:840px;margin:0 auto;padding:26px 18px 80px;}
+.site-nav{display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:22px;padding-bottom:13px;}
+.site-nav a{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;text-decoration:none;color:var(--text-dim);border:1px solid var(--line);border-radius:999px;padding:7px 14px;}
+.site-nav a.is-active{color:var(--bg);background:var(--accent);border-color:var(--accent);}
+.eyebrow{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-2);font-weight:600;margin-bottom:6px;}
+h1{font-family:'Oswald',sans-serif;font-size:32px;font-weight:600;margin-bottom:8px;}
+h2{font-family:'Oswald',sans-serif;font-size:20px;font-weight:600;margin:32px 0 10px;padding-top:18px;border-top:1px solid var(--line);}
+h3{font-size:15.5px;font-weight:700;margin:20px 0 6px;}
+p,li,td,th{font-size:15px;}
+p{color:var(--text-dim);margin-bottom:12px;}
+ul{margin:0 0 14px 20px;} li{color:var(--text-dim);margin-bottom:6px;}
+strong{color:var(--text);}
+table{width:100%;border-collapse:collapse;font-size:14px;margin:12px 0 8px;}
+th{text-align:left;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);}
+td{padding:8px 10px;border-bottom:1px solid var(--line);color:var(--text-dim);vertical-align:top;}
+td:first-child{color:var(--text);font-weight:600;}
+.tbl-scroll{overflow-x:auto;}
+.warn{border:1px solid var(--accent);background:rgba(226,35,26,.09);border-radius:8px;padding:15px 17px;margin:16px 0;}
+.warn p:last-child{margin-bottom:0;}
+.note{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:14px 16px;margin:16px 0;font-size:14.5px;}
+.note p:last-child{margin-bottom:0;}
+.tag{display:inline-block;font-family:'Oswald',sans-serif;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--text-dim);margin-right:6px;vertical-align:1px;}
+.tag.measured{color:var(--success);border-color:var(--success);}
+.tag.vendor{color:var(--accent-2);border-color:var(--accent-2);}
+.tag.principle{color:#7aa7ff;border-color:#7aa7ff;}
+.tag.unverified{color:var(--accent);border-color:var(--accent);}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--text-dim);margin:14px 0 4px;}
+footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--text-dim);text-align:center;}
+footer a{color:var(--text-dim);margin:0 8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="site-nav" aria-label="Site sections">
+    <a href="./index.html">Graphics Kit Builder</a>
+    <a href="./apparel.html">Racewear Builder</a>
+    <a href="./ecu.html">ECU Template Builder</a>
+    <a href="./mods.html" class="is-active" aria-current="page">Modifications</a>
+  </nav>
+
+  <div class="eyebrow">Honda CRF250L / 300L</div>
+  <h1>Modifications, and what each one does to the fuel map</h1>
+  <p>Written because our own ECU builder offered a "PCX150 injector upgrade" for a CRF250L, and it was wrong in a way that could have cost somebody an engine. This page shows the working.</p>
+
+  <div class="legend">
+    <span><span class="tag measured">Measured</span>dyno or bench figure from a named source</span>
+    <span><span class="tag vendor">Vendor</span>seller's own claim, uncorroborated</span>
+    <span><span class="tag principle">Principle</span>physics, not a product claim</span>
+    <span><span class="tag unverified">Unverified</span>we could not confirm it</span>
+  </div>
+
+  <h2>1. The injector mistake, in full</h2>
+
+  <p>A fuel injector is rated by flow &mdash; how much fuel it passes per minute at a given pressure. Bigger number, more fuel per millisecond of injector opening.</p>
+
+  <div class="tbl-scroll">
+  <table>
+    <tr><th>Injector</th><th>Flow</th><th>Holes</th><th>Sold as an upgrade for</th></tr>
+    <tr><td>PCX150 (16450-B06-00H)</td><td>140 cc/min</td><td>6</td><td>Small-displacement Hondas &mdash; Grom, Wave, Click</td></tr>
+    <tr><td>Yuminashi C-type</td><td>235 cc/min</td><td>12</td><td>CRF250L, CBR250R, CBR300R</td></tr>
+    <tr><td>Yuminashi C-type</td><td>260 cc/min</td><td>12</td><td>CRF250L, CBR250R, CBR300R</td></tr>
+    <tr><td>Yuminashi D-type</td><td>270 cc/min</td><td>12</td><td>CRF250L, CBR250R, CBR300R</td></tr>
+  </table>
+  </div>
+  <p><span class="tag measured">Measured</span>Flow figures are the manufacturers' bench ratings, listed on the parts themselves.</p>
+
+  <p>The upgrade path for a CRF250L <strong>starts at 235 cc/min</strong>. The PCX150 injector is <strong>140 cc/min</strong> &mdash; around 40% less. It is not an upgrade for this engine in any sense. It is a substantial downgrade in flow.</p>
+
+  <h3>Why the error is easy to make</h3>
+  <p>The PCX150 injector <em>is</em> a real upgrade &mdash; for a Grom, a Wave or a Click. Those are 110&ndash;125cc engines, and 140 cc/min is a meaningful step up for them. The swap is popular enough that it is discussed constantly on Grom forums. Somebody took a well-known upgrade path for a 125 and applied it to a 250.</p>
+  <p><span class="tag principle">Principle</span>Fuel demand scales with power, not with what fits the fuel rail. An engine making roughly 18&nbsp;hp needs materially more fuel per minute than one making roughly 13, at the same air/fuel ratio. Parts sharing a connector does not make them interchangeable.</p>
+
+  <h3>Why it is dangerous rather than merely useless</h3>
+  <div class="warn">
+    <p>Injector pulse width and injector flow multiply together to give the fuel delivered. A map calculated for one flow rate, run on an injector with a different one, delivers the wrong fuelling by exactly that ratio.</p>
+    <p>Fit a <strong>smaller</strong> injector and keep the map: the engine runs <strong>lean</strong>. Lean mixture burns hotter and is far more prone to detonation, and detonation is what melts piston crowns and burns exhaust valves. Add the ignition advance in a performance map and a free-flowing exhaust &mdash; both of which already push in that direction &mdash; and you have assembled the exact conditions for engine damage.</p>
+    <p>This is why our builder now offers the stock injector only, and says plainly that any other injector makes every fuel number in the file wrong.</p>
+  </div>
+
+  <h3>If you do fit a bigger injector</h3>
+  <p><span class="tag principle">Principle</span>The base fuel map must be scaled by the inverse of the flow ratio. Go from a 185 cc/min injector to a 260, and every pulse width needs multiplying by roughly 185/260, about 0.71, before you flash it &mdash; then verified on a wideband, because injectors are not perfectly linear at short pulse widths and the correction is only a starting point.</p>
+  <p><span class="tag measured">Measured</span>The stock injector on the CRF250L (2013&ndash;2018) is Honda part <strong>16450-MFE-641</strong>, shared with the CBR250R, CBR300R, CB300F and Rebel 300.</p>
+  <p><span class="tag unverified">Unverified</span>Its rated flow we could not confirm. A figure of 240&nbsp;cc/min circulates on forums, but the poster who gave it was himself questioning it, the thread it comes from is now paywalled, and it sits badly against the fact that the smallest injector sold as an <em>upgrade</em> for this engine is 235&nbsp;cc/min &mdash; which would make the upgrade a downgrade. One of those two numbers is wrong and we cannot tell you which. So we publish no scaling factor: the ratio above is an illustration of the method, not a number to flash. If you have the figure from a Honda service manual or a bench test, send it and we will finish this section properly.</p>
+  <p>Bigger is not automatically better either. Oversize the injector and the pulse widths at idle and small throttle openings get so short that metering accuracy falls apart, which is why the sensible ceiling is the smallest injector that still keeps duty cycle within roughly 80&ndash;85% at peak demand.</p>
+
+  <h2>2. What actually needs the map changed</h2>
+
+  <p>The useful division is not "performance parts" versus "cosmetic". It is whether the modification changes how much air the engine swallows, or how much fuel a given command delivers. Those need a remap. Everything else does not.</p>
+
+  <div class="tbl-scroll">
+  <table>
+    <tr><th>Modification</th><th>Remap needed?</th><th>Why</th></tr>
+    <tr><td>Slip-on silencer</td><td>Worth it, not critical</td><td>Modest change in flow. The closed-loop system trims some of it at cruise; the open-loop areas at wide throttle are where it shows.</td></tr>
+    <tr><td>Full exhaust system</td><td>Yes</td><td>Header and silencer together change flow enough to lean out wide-open throttle noticeably.</td></tr>
+    <tr><td>Open airbox / high-flow filter</td><td>Yes</td><td>More air for the same fuel command is a lean shift, in the same direction as the exhaust.</td></tr>
+    <tr><td>Different injector</td><td>Mandatory</td><td>Changes the fuel delivered per millisecond. Nothing compensates for this automatically.</td></tr>
+    <tr><td>Big-bore kit</td><td>Mandatory</td><td>More displacement, more air, more fuel needed everywhere. This is a full retune, not a correction.</td></tr>
+    <tr><td>Cam</td><td>Yes</td><td>Changes where and how the engine breathes; the shape of the map changes, not just its scale.</td></tr>
+    <tr><td>Gearing, suspension, wheels, bars</td><td>No</td><td>Nothing to do with fuelling.</td></tr>
+    <tr><td>Graphics kit</td><td>No</td><td>Included because someone always asks.</td></tr>
+  </table>
+  </div>
+  <p><span class="tag principle">Principle</span>Every row above follows from whether the change moves air or moves fuel. None of it is brand-specific.</p>
+
+  <h2>3. Baseline, and what to expect</h2>
+  <p><span class="tag measured">Measured</span>Independent dyno testing puts a stock CRF250L in the region of 18&nbsp;hp at the wheel, with the 2017 revision picking up roughly 2&nbsp;hp over the earlier engine.</p>
+  <p><span class="tag vendor">Vendor</span>Sellers of exhaust, intake and ECU packages commonly claim around a 15% gain when the three are combined. Treat that as marketing until you have your own dyno sheet: it is a seller's figure for a best-case combination, not an independent measurement of any one part.</p>
+  <div class="note">
+    <p>The honest summary of a 250 dual-sport: exhaust and intake alone move very little without fuelling to match, the fuelling is where the driveability gain actually lives, and no bolt-on turns this engine into a different class of motorcycle. What it does do is clean up the flat spots the factory left in to pass emissions.</p>
+  </div>
+
+  <h2>4. Sources</h2>
+  <ul>
+    <li><a href="https://yuminashi.eu/140cc-min-b-type-injector-6-holes-pcx150-h-injector-16450-b06-00h/">Yuminashi &mdash; 140 cc/min B-type injector (PCX150), part 16450-B06-00H</a></li>
+    <li><a href="https://www.yuminashi.eu/235cc-12-holes-denso-injector-crf250l-cbr250r-cbr300r-cbr600rr/">Yuminashi &mdash; 235 cc/min C-type injector (CRF250L / CBR250R / CBR300R)</a></li>
+    <li><a href="https://yuminashi.eu/260cc-12-holes-denso-injector-crf250l-cbr250r-cbr300r-cbr600rr/">Yuminashi &mdash; 260 cc/min C-type injector (CRF250L / CBR250R / CBR300R)</a></li>
+    <li><a href="https://yuminashi.eu/270cc-12-holes-denso-injector-crf250l-cbr250r-cbr300r-cbr600rr/">Yuminashi &mdash; 270 cc/min D-type injector (CRF250L / CBR250R / CBR300R)</a></li>
+    <li><a href="https://www.hondagrom.net/threads/pcx150-injector.1340/">Honda Grom forum &mdash; PCX150 injector as an upgrade on 125cc engines</a></li>
+    <li><a href="https://motocrosshideout.com/crf250l-mods/">Motocross Hideout &mdash; CRF250L modifications and stock output</a></li>
+    <li><a href="https://dirtbikemagazine.com/dual-sport-report-honda-crf250l-hot-rod-mods/">Dirt Bike Magazine &mdash; CRF250L exhaust dyno testing</a></li>
+  </ul>
+
+  <div class="note">
+    <p>Found something here that is wrong? Say so. This page exists because we shipped a mistake and would rather correct it in public than quietly delete it.</p>
+  </div>
+
+  <footer>CRF Garage &middot; Honda CRF250L / CRF250 Rally / CRF300L / CRF300 Rally</footer>
+</div>
+</body>
+</html>
