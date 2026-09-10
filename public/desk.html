@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<meta name="robots" content="noindex, nofollow">
+<title>Order desk</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#121316; --panel:#1b1d22; --panel-2:#22252b; --line:#2d3037;
+  --text:#eef0f2; --text-dim:#9aa0aa; --accent:#e2231a; --accent-2:#ff8a1e;
+  --ok:#3ddc84; --radius:10px;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:'Inter',system-ui,sans-serif;font-size:15px;line-height:1.5;}
+.wrap{max-width:1000px;margin:0 auto;padding:20px 16px 60px;}
+
+h1{font-family:'Oswald',sans-serif;font-weight:600;font-size:26px;margin:0;letter-spacing:.02em;}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:18px;flex-wrap:wrap;}
+.stamp{font-size:12px;color:var(--text-dim);}
+
+/* unlock */
+.gate{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px;max-width:420px;}
+.gate p{margin:0 0 12px;color:var(--text-dim);font-size:14px;}
+label{display:block;font-size:12px;color:var(--text-dim);margin-bottom:5px;
+  text-transform:uppercase;letter-spacing:.06em;}
+input[type=password]{width:100%;padding:10px 12px;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:6px;color:var(--text);font-size:15px;
+  font-family:inherit;}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px;}
+button{margin-top:12px;padding:10px 18px;background:var(--accent);color:#fff;border:0;
+  border-radius:6px;font-family:'Oswald',sans-serif;font-size:15px;letter-spacing:.04em;
+  cursor:pointer;}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--text-dim);}
+button:disabled{opacity:.5;cursor:default;}
+.err{color:var(--accent-2);font-size:14px;margin-top:10px;min-height:1.2em;}
+
+/* counts */
+.counts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;
+  margin-bottom:22px;}
+.count{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px 14px;}
+.count .n{font-family:'Oswald',sans-serif;font-size:26px;line-height:1.1;}
+.count .k{font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;}
+.count.hot .n{color:var(--accent-2);}
+
+h2{font-family:'Oswald',sans-serif;font-weight:500;font-size:19px;margin:26px 0 10px;
+  letter-spacing:.02em;}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--panel);}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:640px;}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--text-dim);font-weight:500;padding:9px 12px;border-bottom:1px solid var(--line);
+  background:var(--panel-2);white-space:nowrap;}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+td.id{font-family:ui-monospace,Menlo,monospace;white-space:nowrap;}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap;}
+.pill{display:inline-block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+  padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--text-dim);
+  white-space:nowrap;}
+.pill.paid{color:var(--ok);border-color:var(--ok);}
+.pill.wait{color:var(--accent-2);border-color:var(--accent-2);}
+.empty{padding:16px;color:var(--text-dim);font-size:14px;}
+.hint{font-size:13px;color:var(--text-dim);margin-top:22px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <h1>Order desk</h1>
+    <div class="stamp" id="stamp"></div>
+  </div>
+
+  <div class="gate" id="gate">
+    <p>This page shows the order queues. It reads nothing itself &mdash; the
+       server does the reading, and only with this key.</p>
+    <label for="key">Operator key</label>
+    <input type="password" id="key" autocomplete="current-password">
+    <button id="unlock">Unlock</button>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div id="board" hidden>
+    <div class="counts" id="counts"></div>
+    <h2>Graphics kits</h2>
+    <div id="kits"></div>
+    <h2>Racewear</h2>
+    <div id="apparel"></div>
+    <p class="hint">
+      Read-only. Nothing here can mark an order paid or approve artwork &mdash;
+      payment comes from Stripe, approval from the customer.
+      <button class="ghost" id="refresh">Refresh</button>
+      <button class="ghost" id="lock">Lock</button>
+    </p>
+  </div>
+
+</div>
+
+<script>
+const FN = "https://ohcclvcjdbftlnyrrzvt.supabase.co/functions/v1/admin-orders";
+const STORE = "crf-desk-key";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
+  m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+
+function when(iso){
+  if(!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined,{day:"numeric",month:"short"})
+       + " " + d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
+}
+function money(cents, currency){
+  if(cents == null) return "";
+  const n = (cents/100).toLocaleString("en-US",{maximumFractionDigits:0});
+  return currency === "THB" ? "฿" + n : (currency || "") + " " + n;
+}
+function payPill(s){
+  const cls = s === "paid" ? "paid" : s === "unpaid" ? "wait" : "";
+  return `<span class="pill ${cls}">${esc(s)}</span>`;
+}
+function artPill(s){
+  const cls = s === "approved" ? "paid" : s === "pending" ? "wait" : "";
+  return `<span class="pill ${cls}">${esc(String(s).replace("_"," "))}</span>`;
+}
+
+function table(head, rows, emptyMsg){
+  if(!rows.length) return `<div class="tw"><div class="empty">${esc(emptyMsg)}</div></div>`;
+  return `<div class="tw"><table><thead><tr>${
+    head.map(h => `<th>${esc(h)}</th>`).join("")
+  }</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+}
+
+function render(d){
+  $("stamp").textContent = "as of " + when(d.generated_at);
+
+  const c = d.counts || {};
+  $("counts").innerHTML = [
+    ["Kits unpaid", c.kits_unpaid, c.kits_unpaid > 0],
+    ["Kits paid", c.kits_paid, false],
+    ["Awaiting approval", c.apparel_awaiting_approval, c.apparel_awaiting_approval > 0],
+    ["Approved, to invoice", c.apparel_approved_unpaid, c.apparel_approved_unpaid > 0],
+  ].map(([k,n,hot]) =>
+    `<div class="count${hot ? " hot" : ""}"><div class="n">${esc(n ?? 0)}</div>`
+    + `<div class="k">${esc(k)}</div></div>`
+  ).join("");
+
+  $("kits").innerHTML = table(
+    ["Order","Placed","Customer","Fulfilment","Payment"],
+    (d.kits || []).map(o => `<tr>
+      <td class="id">${esc(o.id)}</td>
+      <td class="num">${esc(when(o.created_at))}</td>
+      <td>${esc(o.customer_name)}<br><span style="color:var(--text-dim);font-size:13px;">${esc(o.customer_email)}</span></td>
+      <td>${esc(o.fulfilment)}</td>
+      <td>${payPill(o.payment_status)}${o.paid_at ? `<br><span style="color:var(--text-dim);font-size:12px;">${esc(when(o.paid_at))}</span>` : ""}</td>
+    </tr>`),
+    "No kit orders yet."
+  );
+
+  $("apparel").innerHTML = table(
+    ["Order","Placed","Customer","Garments","Total","Artwork","Payment"],
+    (d.apparel || []).map(o => `<tr>
+      <td class="id">${esc(o.id)}</td>
+      <td class="num">${esc(when(o.created_at))}</td>
+      <td>${esc(o.customer_name)}${o.club_name ? `<br><span style="color:var(--text-dim);font-size:13px;">${esc(o.club_name)}</span>` : ""}<br><span style="color:var(--text-dim);font-size:13px;">${esc(o.customer_email)}</span></td>
+      <td class="num">${esc(o.unit_count)} &times; ${esc(o.garment)}</td>
+      <td class="num">${esc(money(o.total_cents, o.currency))}</td>
+      <td>${artPill(o.artwork_status)}${o.approval_email_sent_at ? "" : `<br><span style="color:var(--text-dim);font-size:12px;">link not emailed</span>`}${o.artwork_note ? `<br><span style="color:var(--text-dim);font-size:12px;">${esc(o.artwork_note)}</span>` : ""}</td>
+      <td>${payPill(o.payment_status)}</td>
+    </tr>`),
+    "No racewear orders yet."
+  );
+}
+
+async function load(key){
+  let res;
+  try{
+    res = await fetch(FN, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key }),
+    });
+  }catch{
+    // fetch itself rejects when the request never lands — offline, DNS, a
+    // captive portal. Without this the browser's own "Failed to fetch" ends
+    // up on screen, which reads like a bug in the page rather than a phone
+    // with no signal.
+    throw new Error("Could not reach the server. Check your connection.");
+  }
+  if(res.status === 401) throw new Error("That key was not accepted.");
+  if(!res.ok) throw new Error("Could not load orders right now.");
+  return res.json();
+}
+
+async function unlock(key, fromStore){
+  $("err").textContent = "";
+  $("unlock").disabled = true;
+  try{
+    const data = await load(key);
+    try{ localStorage.setItem(STORE, key); }catch{}
+    $("gate").hidden = true;
+    $("board").hidden = false;
+    render(data);
+  }catch(e){
+    // A stored key that has since been rotated should not look like a bug.
+    if(fromStore){ try{ localStorage.removeItem(STORE); }catch{} }
+    $("err").textContent = e.message;
+  }finally{
+    $("unlock").disabled = false;
+  }
+}
+
+$("unlock").addEventListener("click", () => unlock($("key").value.trim(), false));
+$("key").addEventListener("keydown", (e) => { if(e.key === "Enter") $("unlock").click(); });
+
+$("refresh").addEventListener("click", async () => {
+  let key = "";
+  try{ key = localStorage.getItem(STORE) || ""; }catch{}
+  if(!key) return;
+  try{ render(await load(key)); }
+  catch(e){ $("stamp").textContent = e.message; }
+});
+
+$("lock").addEventListener("click", () => {
+  try{ localStorage.removeItem(STORE); }catch{}
+  location.reload();
+});
+
+// A key kept from last time is a convenience on one device. It is not a
+// second way in: the server checks it on every request either way.
+(function(){
+  let key = "";
+  try{ key = localStorage.getItem(STORE) || ""; }catch{}
+  if(key) unlock(key, true);
+})();
+</script>
+</body>
+</html>

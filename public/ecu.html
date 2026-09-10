@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <title>CRF ECU Template Builder</title>
+  <style>
+    :root {
+      --bg: #0c0d10;
+      --panel: #15171c;
+      --border: #2a2d35;
+      --text: #e8e9ec;
+      --muted: #9aa0ab;
+      --accent: #e4342b;
+      --accent-dim: #a8241d;
+      --ok: #34c759;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.5;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 40px 20px 80px; }
+    header { margin-bottom: 36px; }
+    .badge {
+      display: inline-block; font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--accent); border: 1px solid var(--accent-dim); border-radius: 999px;
+      padding: 4px 12px; margin-bottom: 14px; font-family: ui-monospace, monospace;
+    }
+    h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; }
+    header p { color: var(--muted); margin-top: 8px; max-width: 620px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px;
+      /* Grid items default to min-width:auto, which lets the JSON preview's
+         long lines widen the whole page instead of scrolling inside <pre>. */
+      min-width: 0;
+    }
+    .panel h2 {
+      font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px;
+      color: var(--muted); margin-bottom: 18px; font-family: ui-monospace, monospace;
+    }
+    .field { margin-bottom: 18px; }
+    .field label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .field .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    select, input[type="range"] { width: 100%; }
+    select {
+      background: var(--bg); color: var(--text); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 12px; font-size: 14px;
+    }
+    .toggle-row {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 14px;
+    }
+    .toggle-row input[type="checkbox"] { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); }
+    .toggle-row .t-label { font-weight: 600; font-size: 14px; }
+    .toggle-row .t-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .slider-val { font-family: ui-monospace, monospace; color: var(--accent); font-weight: 700; }
+    input[type="range"] { accent-color: var(--accent); margin-top: 8px; }
+    pre {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px; font-size: 12px; overflow-x: auto; max-height: 420px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #b9e0a5;
+    }
+    .disclaimer {
+      border: 1px solid var(--accent-dim); background: rgba(228, 52, 43, 0.06);
+      border-radius: 10px; padding: 16px; margin: 24px 0; font-size: 13px; color: var(--muted);
+    }
+    .disclaimer strong { color: var(--text); }
+    .disclaimer label { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; color: var(--text); font-weight: 600; cursor: pointer; }
+    .disclaimer input[type="checkbox"] { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--accent); }
+    .gate { margin: 20px 0; }
+    .gate label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .gate input[type="email"] {
+      width: 100%; background: var(--panel); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px; font-size: 14px;
+    }
+    .gate input[type="email"]:focus { outline: none; border-color: var(--accent); }
+    .gate .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    button {
+      width: 100%; padding: 14px; font-size: 15px; font-weight: 700; border: none;
+      border-radius: 10px; background: var(--accent); color: #fff; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+    .downloaded { color: var(--ok); font-size: 13px; text-align: center; margin-top: 10px; min-height: 20px; }
+    footer { margin-top: 40px; font-size: 12px; color: var(--muted); text-align: center; }
+  
+    /* Shared site nav — mirrors the graphics kit builder. */
+    .site-nav {
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px; padding-bottom: 14px;
+    }
+    .site-nav a {
+      font-family: ui-monospace, monospace;
+      font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+      font-weight: 700; text-decoration: none;
+      color: var(--muted);
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 7px 14px; transition: color 0.15s, border-color 0.15s;
+    }
+    .site-nav a:hover { color: var(--text); border-color: var(--muted); }
+    .site-nav a.is-active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <nav class="site-nav" aria-label="Site sections">
+      <a href="./index.html">Graphics Kit Builder</a>
+      <a href="./apparel.html">Racewear Builder</a>
+      <a href="./ecu.html" class="is-active" aria-current="page">ECU Template Builder</a>
+      <a href="./mods.html">Modifications</a>
+    </nav>
+    <header>
+      <div class="badge">NA &middot; Pump Gas &middot; Base File</div>
+      <h1>CRF ECU Template Builder</h1>
+      <p>Build your base file for the Honda CRF250L / CRF250 Rally / CRF300L / CRF300 Rally.
+         For naturally aspirated engines running 91&ndash;95 octane with an aftermarket intake and full exhaust.
+         Load the downloaded JSON into your standalone ECU software (aRacer, etc.) or hand it to your tuner.</p>
+    </header>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>1 &middot; Your Build</h2>
+        <div class="field">
+          <label for="model">Motorcycle</label>
+          <select id="model">
+            <option value="Honda CRF250L">Honda CRF250L (250cc)</option>
+            <option value="Honda CRF250 Rally">Honda CRF250 Rally (250cc)</option>
+            <option value="Honda CRF300L">Honda CRF300L (286cc)</option>
+            <option value="Honda CRF300 Rally">Honda CRF300 Rally (286cc)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="injector">Injector</label>
+          <select id="injector">
+            <option value="OEM">OEM (stock)</option>
+          </select>
+          <div class="hint">This map is calculated for the stock injector. Fit a different one and every fuel number here is wrong by the ratio of the two flow rates &mdash; a smaller injector runs you lean, which is what holes pistons. See the <a href="./mods.html" style="color:var(--accent);">modifications guide</a> before changing it.</div>
+        </div>
+        <div class="field">
+          <label for="fuel">Fuel</label>
+          <select id="fuel">
+            <option value="Pump Gas (91 - 95 Octane)">Pump gas, 91&ndash;95 octane</option>
+          </select>
+          <div class="hint">This base file is only valid for high-octane pump gas. No E85, no low octane.</div>
+        </div>
+
+        <h2 style="margin-top: 28px;">2 &middot; Features</h2>
+        <div class="toggle-row">
+          <input type="checkbox" id="launch" checked>
+          <div>
+            <div class="t-label">Launch control</div>
+            <div class="t-desc">Secondary rev limiter for hard launches. &minus;5&deg; ignition, +10% fuel at the hold point.</div>
+            <div class="field" style="margin: 10px 0 0;">
+              <label style="font-size:12px;">Hold RPM: <span class="slider-val" id="launchRpmVal">6500</span></label>
+              <input type="range" id="launchRpm" min="5500" max="8000" step="100" value="6500">
+              <div class="hint">6,500 RPM sits just below peak torque on a stock-displacement CRF &mdash; aggressive launch without looping or bogging.</div>
+            </div>
+          </div>
+        </div>
+        <div class="toggle-row">
+          <input type="checkbox" id="decel" checked>
+          <div>
+            <div class="t-label">Pops, bangs &amp; flames (decel map)</div>
+            <div class="t-desc">Throttle closed (0&ndash;3% TPS) between 4,500&ndash;8,500 RPM: +15% fuel, &minus;2&deg; timing. Unburnt fuel detonates in the hot header on downshifts.</div>
+          </div>
+        </div>
+        <div class="toggle-row">
+          <input type="checkbox" id="bounce">
+          <div>
+            <div class="t-label">Bounce limiter (soft rev limiter)</div>
+            <div class="t-desc">A second, lower limiter you can sit on deliberately. On ignition cut the charge leaves unburnt and lights in the header, so it bangs and throws flame every time it catches.</div>
+            <div class="field" style="margin: 10px 0 0;">
+              <label style="font-size:12px;">Bounce RPM: <span class="slider-val" id="bounceRpmVal">9500</span></label>
+              <input type="range" id="bounceRpm" min="8000" max="10200" step="100" value="9500">
+              <div class="hint">Stays below the 10,500 hard limiter, which is fuel cut and is there to protect the engine. This one never replaces it.</div>
+            </div>
+            <div class="field" style="margin: 10px 0 0;">
+              <label for="bounceCut" style="font-size:12px;">Cut type</label>
+              <select id="bounceCut">
+                <option value="ignition_cut">Ignition cut &mdash; bangs and flames</option>
+                <option value="fuel_cut">Fuel cut &mdash; quiet, easier on the engine</option>
+              </select>
+              <div class="hint" id="bounceCutHint"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>3 &middot; Your File</h2>
+        <pre id="preview"></pre>
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      <strong>Read before flashing.</strong> This is a base file intended for motorcycles with a
+      free-flowing aftermarket exhaust and intake. This base map has been run on a dyno, so the
+      numbers are not guesses &mdash; but that was our bike, not yours. Altitude, fuel, wear and your
+      exact exhaust all move the mixture, so verify AFR with a wideband on your own machine before
+      extended use. Running the decel-flame map or an ignition-cut bounce limiter on a factory
+      exhaust with a catalytic converter will destroy the converter. Sitting on an ignition-cut
+      limiter puts raw fuel and a lot of heat through the exhaust valves and header &mdash; it is a
+      party trick, not a way to ride. Emissions-related modifications may be restricted to
+      closed-course / off-road use in your jurisdiction &mdash; know your local law.
+      <label>
+        <input type="checkbox" id="agree">
+        I understand this is a dyno-tested base file rather than a tune for my bike, I will verify AFR before extended use, and I accept responsibility for legal compliance.
+      </label>
+    </div>
+
+    <div class="gate">
+      <label for="email">Email address</label>
+      <input type="email" id="email" placeholder="you@example.com" autocomplete="email">
+      <div class="hint">We send your file here and let you know when the map is updated. No spam.</div>
+    </div>
+
+    <button id="download" disabled>Download ECU Template (.json)</button>
+    <div class="downloaded" id="doneMsg"></div>
+
+    <footer>CRF250L / CRF250 Rally / CRF300L / CRF300 Rally &middot; NA pump gas base file &middot; v1.0</footer>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function buildConfig() {
+      const model = $("model").value;
+      const is300 = model.includes("300");
+      const launchOn = $("launch").checked;
+      const decelOn = $("decel").checked;
+      const bounceOn = $("bounce").checked;
+      const bounceCut = $("bounceCut").value;
+      const config = {
+        build_profile: {
+          platform: model,
+          engine: is300 ? "Standard Displacement (286cc)" : "Standard Displacement (250cc)",
+          induction: "Naturally Aspirated (Aftermarket Intake & Exhaust)",
+          fuel_type: $("fuel").value,
+          // The downloaded file has to carry this, not just the page: the file is
+          // what gets flashed, often by someone who never saw the page.
+          injector: $("injector").value + " (stock). These fuel numbers are calculated for the stock injector's flow rate. A different injector makes every one of them wrong by the ratio of the two flow rates, and a smaller one runs the engine lean.",
+          ecu_type: "Standalone / Flash"
+        },
+        safety_parameters: {
+          target_afr_cruising: [13.2, 13.5],
+          target_afr_wot: [12.8, 13.1],
+          rev_limiter_rpm: 10500
+        },
+        features: {
+          launch_control: {
+            status: launchOn ? "enabled" : "disabled",
+            activation_rpm: parseInt($("launchRpm").value, 10),
+            activation_conditions: {
+              note: "The launch limiter must only arm when ALL of these are true. Without them, activation_rpm behaves as a rev limiter in every gear.",
+              clutch_pulled_in: true,
+              max_gear: 1,
+              max_road_speed_kph: 5
+            },
+            ignition_retard_degrees: -5,
+            fuel_enrichment_percent: 10,
+            cut_type: "ignition_cut"
+          },
+          decel_flames_pops: {
+            status: decelOn ? "enabled" : "disabled",
+            disable_dfco: decelOn,
+            dfco_note: "Deceleration fuel cut-off must be off for this to do anything. With DFCO active the ECU cuts fuel on a closed throttle, so fuel_correction_percent has nothing to enrich.",
+            tps_range_percent: [0, 3],
+            rpm_range: [4500, 8500],
+            ignition_timing_btdc: -2,
+            fuel_correction_percent: 15
+          },
+          rev_limiter_bounce: {
+            status: bounceOn ? "enabled" : "disabled",
+            activation_rpm: parseInt($("bounceRpm").value, 10),
+            cut_type: bounceCut,
+            // Ignition cut leaves fuel in the charge, which is what lights in the
+            // header. Fuel cut has nothing left to burn, so enriching it is
+            // meaningless -- those keys are only emitted for ignition cut.
+            ...(bounceCut === "ignition_cut" ? {
+              cut_pattern: "random",
+              ignition_retard_degrees: -8,
+              fuel_enrichment_percent: 12
+            } : {}),
+            must_stay_below_rpm: 10500,
+            note: "A soft limiter sat below the hard limiter, for deliberate use. It never replaces rev_limiter_rpm, which is fuel cut and protects the engine."
+          }
+        },
+        base_fuel_map_correction_percent: {
+          description: "NA Pump Gas map for Intake + Full Exhaust. RPM vs TPS(%)",
+          "2000_rpm": {"0": 0, "20": 2, "40": 4, "60": 5, "80": 6, "100": 8},
+          "5000_rpm": {"0": 0, "20": 4, "40": 6, "60": 8, "80": 10, "100": 12},
+          "9000_rpm": {"0": 0, "20": 6, "40": 8, "60": 10, "80": 12, "100": 14}
+        },
+        base_ignition_map_btdc: {
+          description: "NA Pump Gas timing map. RPM vs TPS(%)",
+          "2000_rpm": {"0": 15, "20": 18, "40": 20, "60": 22, "80": 24, "100": 26},
+          "5000_rpm": {"0": 25, "20": 28, "40": 30, "60": 32, "80": 33, "100": 34},
+          "9000_rpm": {"0": 28, "20": 30, "40": 32, "60": 34, "80": 36, "100": 37}
+        }
+      };
+      return config;
+    }
+
+    const emailValid = () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($("email").value.trim());
+
+    const BOUNCE_CUT_HINT = {
+      ignition_cut: "Spark is cut but fuel keeps flowing, so the charge lights in the header. This is the one that makes flame. It is also the one that cooks exhaust valves and headers if you sit on it.",
+      fuel_cut: "Injection stops, so there is nothing left to burn. No bang, no flame, far kinder to the engine."
+    };
+
+    function refresh() {
+      $("launchRpmVal").textContent = $("launchRpm").value;
+      $("launchRpm").disabled = !$("launch").checked;
+      $("bounceRpmVal").textContent = $("bounceRpm").value;
+      $("bounceRpm").disabled = !$("bounce").checked;
+      $("bounceCut").disabled = !$("bounce").checked;
+      $("bounceCutHint").textContent = BOUNCE_CUT_HINT[$("bounceCut").value];
+      $("preview").textContent = JSON.stringify(buildConfig(), null, 2);
+      $("download").disabled = !($("agree").checked && emailValid());
+    }
+
+    // Fire and forget: a slow or blocked post must never hold up the download.
+    //
+    // This used to POST to "/" for Netlify Forms, which meant the capture only
+    // worked while the site sat on Netlify and would have died quietly on any
+    // other host — the catch below swallows the failure, so the download would
+    // have carried on working and the leads would simply have stopped.
+    //
+    // It writes to Supabase now, on the same terms as every other browser write
+    // here: the publishable key, INSERT and nothing else, no read back.
+    const LEADS_URL =
+      "https://ohcclvcjdbftlnyrrzvt.supabase.co/rest/v1/crf_ecu_leads";
+    const SUPABASE_KEY = "sb_publishable_-u9yj16rZFqBZoQBkeLAQA_HTFbTtOf";
+
+    function recordLead() {
+      fetch(LEADS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_KEY,
+          "Authorization": "Bearer " + SUPABASE_KEY,
+          // anon has no SELECT here, so asking for the row back would 401.
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({
+          email: $("email").value.trim(),
+          model: $("model").value
+        })
+      }).catch(() => {});
+    }
+
+    function download() {
+      const config = buildConfig();
+      const model = $("model").value.toLowerCase().replace(/\s+/g, "-");
+      recordLead();
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = model + "-na-pumpgas-ecu-template.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      $("doneMsg").textContent = "Downloaded " + a.download + " — verify AFR before extended use.";
+    }
+
+    ["model", "injector", "fuel", "launch", "decel", "launchRpm", "bounce", "bounceRpm", "bounceCut", "agree", "email"].forEach((id) =>
+      $(id).addEventListener("input", refresh)
+    );
+    $("download").addEventListener("click", download);
+    refresh();
+  </script>
+</body>
+</html>

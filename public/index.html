@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<title>CRF250L Kit Builder</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg:#121316;
+  --panel:#1b1d22;
+  --panel-2:#22252b;
+  --line:#2d3037;
+  --text:#eef0f2;
+  --text-dim:#9aa0aa;
+  --accent:#e2231a;
+  --accent-2:#ff8a1e;
+  --success:#3ddc84;
+  --plastic:#3a3d44;
+  --radius:10px;
+}
+a{color:var(--accent-2);}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--accent);color:#fff;}
+:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px;}
+
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px;}
+
+header.top{margin-bottom:28px;}
+.eyebrow{
+  font-family:'Oswald',sans-serif;
+  font-size:12px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--accent-2);
+  font-weight:600;
+  display:flex;align-items:center;gap:8px;
+}
+.eyebrow::before{content:"";width:18px;height:2px;background:var(--accent);display:inline-block;}
+h1{
+  font-family:'Oswald',sans-serif;
+  font-weight:700;
+  font-size:clamp(28px,4vw,42px);
+  letter-spacing:-0.01em;
+  margin:8px 0 6px;
+}
+.sub{color:var(--text-dim);font-size:15px;max-width:640px;line-height:1.5;}
+
+.grid{
+  display:grid;
+  grid-template-columns:1.15fr 1fr;
+  gap:20px;
+  align-items:start;
+}
+@media (max-width:860px){
+  .grid{grid-template-columns:1fr;}
+}
+
+.card{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:20px;
+}
+.card h2{
+  font-family:'Oswald',sans-serif;
+  font-size:15px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  margin:0 0 4px;
+  font-weight:600;
+}
+.card .hint{color:var(--text-dim);font-size:13px;margin:0 0 16px;line-height:1.5;}
+
+/* overview map */
+.map-svg-wrap{
+  background:var(--panel-2);
+  border-radius:8px;
+  border:1px solid var(--line);
+  padding:10px;
+}
+svg{display:block;width:100%;height:auto;}
+.zone-group{cursor:pointer;}
+.zone-shape{
+  fill:var(--plastic);
+  stroke:#54585f;
+  stroke-width:260;
+  transition:fill .15s ease, stroke .15s ease;
+}
+.zone-group:hover .zone-shape{fill:#4a4e56;}
+.zone-group.selected .zone-shape{fill:var(--accent);stroke:var(--accent);}
+.zone-group.has-design .zone-shape{fill:#2f6b4f;stroke:#3ddc84;}
+.zone-group.has-design.selected .zone-shape{fill:var(--accent);stroke:var(--accent);}
+.zone-edge{fill:none;stroke:#0c0d0f;stroke-width:220;}
+.zone-group.selected .zone-edge{stroke:var(--accent-2);}
+
+.zone-list{
+  display:flex;flex-direction:column;gap:8px;margin-top:16px;
+}
+.zone-chip{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:10px 12px;
+  font-size:13.5px;
+  cursor:pointer;
+  transition:border-color .15s ease;
+}
+.zone-chip:hover{border-color:#454951;}
+.zone-chip.selected{border-color:var(--accent);}
+.zone-chip .dot{width:8px;height:8px;border-radius:50%;background:#54585f;flex-shrink:0;}
+.zone-chip.done .dot{background:var(--success);}
+.zone-chip .name{flex:1;margin-left:10px;}
+.zone-chip .status{color:var(--text-dim);font-size:12px;}
+
+/* workspace */
+.ws-empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;
+  padding:50px 20px;
+  color:var(--text-dim);
+  border:1px dashed var(--line);
+  border-radius:8px;
+  font-size:13.5px;
+  line-height:1.6;
+}
+.ws-title{
+  font-family:'Oswald',sans-serif;
+  font-weight:600;
+  font-size:16px;
+  color:var(--text);
+  margin-bottom:14px;
+}
+.upload-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--accent);
+  color:#fff;
+  border:none;
+  padding:11px 18px;
+  border-radius:7px;
+  font-weight:600;
+  font-size:13.5px;
+  cursor:pointer;
+  font-family:'Inter',sans-serif;
+}
+.upload-btn:hover{background:#c91d15;}
+.stage-thumbs{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:14px;}
+.stage-thumb{position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid var(--line);}
+.stage-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.stage-thumb-remove{
+  position:absolute;top:2px;right:2px;
+  width:18px;height:18px;border-radius:50%;
+  background:rgba(18,19,22,0.85);color:#fff;border:none;
+  font-size:12px;line-height:1;cursor:pointer;
+}
+.ws-canvas-wrap{
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:8px;
+  overflow:hidden;
+  touch-action:none;
+  cursor:grab;
+}
+.ws-canvas-wrap.dragging{cursor:grabbing;}
+.controls{margin-top:14px;display:flex;flex-direction:column;gap:12px;}
+.ctrl-row{display:flex;flex-direction:column;gap:6px;}
+.ctrl-row label{
+  font-size:12px;color:var(--text-dim);
+  display:flex;justify-content:space-between;
+}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:4px;
+  background:var(--line);border-radius:2px;outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+  background:var(--accent-2);cursor:pointer;border:2px solid #14161a;
+}
+.btn-row{display:flex;gap:8px;margin-top:4px;}
+.btn-sm{
+  flex:1;
+  background:var(--panel);
+  border:1px solid var(--line);
+  color:var(--text);
+  padding:9px 10px;
+  border-radius:6px;
+  font-size:12.5px;
+  cursor:pointer;
+  font-family:'Inter',sans-serif;
+  font-weight:500;
+}
+.btn-sm:hover{border-color:#565a62;}
+.btn-sm.danger{color:#ff8a8a;}
+
+/* order */
+.order-card{margin-top:20px;}
+.fulfil-choice{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+.fulfil-option{
+  flex:1;min-width:220px;
+  display:flex;gap:10px;align-items:flex-start;
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:12px 14px;
+  cursor:pointer;
+  transition:border-color .15s ease;
+}
+.fulfil-option:has(input:checked){border-color:var(--accent);}
+.fulfil-option input{margin-top:3px;accent-color:var(--accent);}
+.fulfil-title{display:block;font-weight:600;font-size:13.5px;}
+.fulfil-desc{display:block;color:var(--text-dim);font-size:12.5px;margin-top:2px;line-height:1.4;}
+.payment-note{color:var(--accent-2);}
+.field-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+.field{flex:1;min-width:200px;display:flex;flex-direction:column;gap:6px;}
+.field label{font-size:12.5px;color:var(--text-dim);}
+.field input,.field textarea{
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:6px;
+  color:var(--text);
+  padding:10px 12px;
+  font-family:'Inter',sans-serif;
+  font-size:13.5px;
+}
+.field textarea{resize:vertical;min-height:70px;}
+.summary-line{
+  display:flex;justify-content:space-between;
+  font-size:13px;color:var(--text-dim);
+  padding:6px 0;border-top:1px solid var(--line);
+}
+.submit-btn{
+  width:100%;
+  background:var(--accent);
+  color:#fff;border:none;
+  padding:14px;border-radius:8px;
+  font-family:'Oswald',sans-serif;
+  font-weight:600;font-size:14px;letter-spacing:.03em;
+  text-transform:uppercase;
+  cursor:pointer;margin-top:8px;
+}
+.submit-btn:disabled{background:#3a3d44;color:var(--text-dim);cursor:not-allowed;}
+.submit-btn:not(:disabled):hover{background:#c91d15;}
+.err-msg{color:#ff8a8a;font-size:12.5px;margin-top:8px;}
+
+/* confirmation */
+.confirm{
+  text-align:center;padding:40px 20px;
+}
+.confirm .id{
+  font-family:'Oswald',sans-serif;font-size:28px;font-weight:700;
+  color:var(--success);margin:10px 0;
+}
+.confirm p{color:var(--text-dim);font-size:14px;max-width:440px;margin:6px auto;line-height:1.6;}
+.confirm .btn-sm{max-width:200px;margin:20px auto 0;}
+
+.kitwide{border:1px solid var(--line);border-radius:8px;padding:13px 14px;margin:14px 0 4px;background:var(--panel);}
+.kitwide-title{font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-2);font-weight:600;margin-bottom:4px;}
+.kitwide-actions{display:flex;gap:8px;margin-top:11px;}
+.btn-sm.ghost{background:transparent;}
+.printed-shot{margin:12px 0 4px;}
+.printed-shot img{width:100%;border-radius:8px;border:1px solid var(--line);display:block;}
+.printed-shot figcaption{font-size:12px;color:var(--text-dim);margin-top:6px;line-height:1.45;}
+.preset-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;}
+.preset{border:1px solid var(--line);border-radius:6px;overflow:hidden;cursor:pointer;background:var(--panel-2);padding:0;text-align:left;}
+.preset:hover{border-color:var(--text-dim);}
+.preset.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+.preset img{width:100%;height:44px;object-fit:cover;display:block;}
+.preset span{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);padding:5px 6px;}
+.preset.sel span{color:var(--text);}
+@media(max-width:520px){.preset-row{grid-template-columns:repeat(2,1fr);}}
+.bike-preview{margin-top:16px;}
+.bike-preview .map-svg-wrap{margin-top:10px;}
+#bike-svg{width:100%;height:auto;display:block;}
+.bike-line{fill:none;stroke:#6f7681;stroke-width:6;stroke-linecap:round;stroke-linejoin:round;}
+.bike-thin{fill:none;stroke:#666d78;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;}
+.bike-tube{fill:none;stroke:#828a96;stroke-width:9;stroke-linecap:round;stroke-linejoin:round;}
+.bike-pipe{fill:none;stroke:#767d88;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;}
+.bike-fill{fill:#383d47;stroke:#7c848f;stroke-width:4;stroke-linejoin:round;}
+.bike-mass{fill:#454b56;stroke:#8b939f;stroke-width:4;stroke-linejoin:round;}
+.bike-tyre{fill:none;stroke:#2b2f36;stroke-width:30;}
+.bike-rim{fill:none;stroke:#79808b;stroke-width:4;}
+.bike-hub{fill:#454b56;stroke:#79808b;stroke-width:4;}
+.bike-disc{fill:none;stroke:#4f5661;stroke-width:3;}
+.bike-spoke{stroke:#474d57;stroke-width:2;}
+.bike-panel-blank{fill:#3a3d44;stroke:#e2231a;stroke-width:2.5;stroke-linejoin:round;}
+.bike-panel-edge{fill:none;stroke:#e2231a;stroke-width:2.5;stroke-linejoin:round;}
+
+/* ── SHARED SITE NAV ─────────────────────── */
+.site-nav{
+  display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+  border-bottom:1px solid var(--line);
+  margin-bottom:24px; padding-bottom:14px;
+}
+.site-nav a{
+  font-family:'Oswald',sans-serif;
+  font-size:12px; letter-spacing:.12em; text-transform:uppercase;
+  font-weight:600; text-decoration:none;
+  color:var(--text-dim);
+  border:1px solid var(--line); border-radius:999px;
+  padding:7px 14px; transition:color .15s,border-color .15s;
+}
+.site-nav a:hover{ color:var(--text); border-color:var(--text-dim); }
+.site-nav a.is-active{ color:var(--bg); background:var(--accent); border-color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+
+  <nav class="site-nav" aria-label="Site sections">
+    <a href="./index.html" class="is-active" aria-current="page">Graphics Kit Builder</a>
+    <a href="./apparel.html">Racewear Builder</a>
+    <a href="./ecu.html">ECU Template Builder</a>
+    <a href="./mods.html">Modifications</a>
+  </nav>
+  <header class="top">
+    <div class="eyebrow">Honda CRF250L &middot; 2007&ndash;2020 &middot; Real panel geometry</div>
+    <h1>Build your kit</h1>
+    <p class="sub">Pick a panel, drop your design on it, and see it fit the actual CRF250L shape. When you submit, we cut and print your kit and ship it &mdash; no files, just the finished graphics.</p>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Panel map &middot; live preview</h2>
+      <p class="hint">Tap a panel to work on it. As you place designs, this map fills in with them, so it doubles as a preview of the assembled kit, built from the real cut lines, not a mockup photo.</p>
+      <div class="map-svg-wrap">
+        <svg id="overview-svg" viewBox="0 0 229698.95 141090.28" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+
+      <div class="kitwide">
+        <div class="kitwide-head">
+          <div>
+            <div class="kitwide-title">One design across the whole kit</div>
+            <div class="hint">Drop in a single image and it is laid over every panel at once, so the artwork runs continuously across shrouds, tank and fenders the way a real kit does. Adjust any panel afterwards.</div>
+          </div>
+        </div>
+        <div class="preset-row" id="preset-row"></div>
+        <div class="kitwide-actions">
+          <button class="btn-sm" id="kitwide-btn">Upload your own artwork</button>
+          <button class="btn-sm ghost" id="kitwide-clear" style="display:none;">Clear all panels</button>
+        </div>
+        <div class="hint" id="kitwide-msg" style="display:none;"></div>
+      </div>
+
+      <div class="bike-preview">
+        <div class="kitwide-title">On the bike</div>
+        <p class="hint">The right-hand side, with your panels sitting where they actually land on a CRF250L. Same cut geometry as the map above &mdash; the bike underneath is a line drawing, so nothing here depends on a photo.</p>
+        <div class="map-svg-wrap">
+          <svg id="bike-svg" viewBox="0 0 1000 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kit shown on a CRF250L side profile"></svg>
+        </div>
+      </div>
+
+      <div class="zone-list" id="zone-list"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="ws-heading">Workspace</h2>
+      <p class="hint" id="ws-hint">Select a panel on the left to start.</p>
+      <div id="ws-body">
+        <div class="ws-empty">Choose a panel from the map to begin designing.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card order-card" id="order-card">
+    <h2>Order</h2>
+    <div class="fulfil-choice" id="fulfil-choice">
+      <label class="fulfil-option">
+        <input type="radio" name="fulfil" value="digital" checked>
+        <span class="fulfil-body">
+          <span class="fulfil-title">Print-ready file</span>
+          <span class="fulfil-desc">Your finished design as a vector file, sized to the real CRF250L cut lines. Take it to any vinyl printer. Delivered as soon as your payment clears.</span>
+        </span>
+      </label>
+    </div>
+    <p class="hint">We are not printing and shipping kits ourselves at the moment, so the file is what you get &mdash; and it is the part a printer needs.</p>
+    <figure class="printed-shot">
+      <img src="kits/printed-sheet.jpg" alt="A die-cut sheet of printed motocross vinyl panels" loading="lazy">
+      <figcaption>What a printer turns your file into. This is an illustration, not a photograph of your kit &mdash; your panels are cut to the shapes on the map above.</figcaption>
+    </figure>
+    <p class="hint payment-note" id="payment-note">Your kit file is released after Stripe confirms your payment &mdash; pay, then press &ldquo;Check payment &amp; download&rdquo; on the confirmation.</p>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="f-name">Name</label>
+        <input id="f-name" type="text" placeholder="Your name" autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="f-email">Email</label>
+        <input id="f-email" type="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="f-notes">Notes (optional)</label>
+        <textarea id="f-notes" placeholder="Colours, background, anything to know before we cut it"></textarea>
+      </div>
+    </div>
+    <div id="summary-lines"></div>
+    <button class="submit-btn" id="submit-btn" disabled>Place a panel design first</button>
+    <div class="err-msg" id="err-msg" style="display:none;"></div>
+    <div id="confirm-area"></div>
+  </div>
+
+  <footer style="margin-top:38px;font-size:12px;color:var(--text-dim);text-align:center;">CRF Garage &middot; custom CRF250L graphics</footer>
+
+</div>
+
+<script>
+const VIEWBOX = "0 0 229698.95 141090.28";
+// PATHS[9] is a duplicate of PATHS[8] -- the same outline, exported once
+// closed and once open. It is no longer referenced by any zone. Left in
+// place because removing it would reindex every other zone for no gain.
+const PATHS = ["M82123.7 16603.29c0,0 835.08,-161.8 974.84,-751.49 139.73,-589.62 588.67,-1254.18 1104.55,-1289.4 516.16,-35.16 3030.22,553.62 3030.22,553.62 0,0 941.77,260.85 1464.32,1031.04 522.63,770.16 4684.54,5909.64 4684.54,5909.64 0,0 520.38,501.71 -12.19,1042.97 -532.61,541.25 -4312,3060.67 -4312,3060.67 0,0 -2363.33,163.85 -2720.89,631.32 -357.66,467.65 -714.09,1069.5 -1342.44,1270.85 -628.26,201.17 -20623.05,2295.07 -21655.09,2365.41 -1032.06,70.45 -883.42,-705.26 -824.04,-1015.48 59.44,-310.27 620.62,-1140.96 1113.58,-1475.43 492.86,-334.53 15617.37,-10866.31 16130.11,-11304.21 512.86,-437.74 1375.28,236.64 2364.5,-29.5z", "M94077.77 53727.27c-473.98,321.59 -1118.9,198.18 -1440.51,-275.84 -321.62,-474.02 -198.04,-1118.86 275.98,-1440.54 474.05,-321.66 1118.93,-198.05 1440.55,275.94 321.51,473.98 197.9,1118.93 -276.01,1440.45zm21209.98 -17551.65c-598.08,-756.26 -15840.68,-20306.03 -17578.73,-22477.38 -213.57,-266.92 -436.92,-422.65 -750.2,-429.61 -1009.32,-22.24 -3908.08,-1553.02 -4116.45,-1771.7 -208.46,-218.68 -543.09,128.38 -271.54,484.27l3018.16 5019.35c0,0 359.09,195.27 376.33,-394.31 17.21,-589.49 603.05,-2042.26 1479.93,-1767.1 876.84,275.15 936.28,1151.12 709.52,2055.14 -226.86,903.99 -800.68,1473.45 -1089.83,1489.56 -289.06,16.17 -625.19,184.1 -268.59,842.37 356.64,658.22 9486.5,16192.37 9808.15,16704.1 321.59,511.79 963.02,1912.83 249.75,2276.75 -713.31,364 -6303.4,1456.24 -6303.4,1456.24 0,0 -275.84,-52.83 -664.16,480.63 -388.11,533.42 -9464.52,14973.35 -9464.52,14973.35 0,0 -230.4,456.34 278.83,410.97 509.27,-45.55 5885.18,-1232.49 5885.18,-1232.49 0,0 468.05,-17.54 966.4,-565.68 498.27,-548.14 6956.65,-6640.52 8852.2,-8136.62 1895.45,-1496.17 8264.97,-5817.81 9059.04,-6416.62 793.93,-598.65 457.15,-2200.55 -176.07,-3001.2z", "M88892.82 31368.64c-547.79,371.76 -1293.29,229 -1665.02,-318.87 -371.69,-547.83 -228.9,-1293.32 318.89,-1665.02 547.87,-371.76 1293.32,-228.93 1665.02,319 371.84,547.79 228.94,1293.26 -318.89,1664.88zm16449.52 5636.39l-17896.57 -9144.33c0,0 -200.53,2.48 -360.52,111.04 -159.93,108.53 -1358.52,1038.61 -1981.22,1383.22 -622.64,344.62 -2561.79,297.85 -3632.72,440.57 -1071.1,142.75 -18874.64,1672.64 -19427.72,1775.45 -553.07,102.7 -380.82,414 -380.82,414 0,0 9182.75,4124.64 9559.72,4335.94 377.04,211.43 903.51,126.71 903.51,126.71 0,0 1241.45,-63.66 2518.02,-190.27 1276.67,-126.55 2807.45,236.26 6246.04,1173.26 3438.56,936.86 9169.78,2952.35 9169.78,2952.35 0,0 1365.94,591.97 1494.97,817.81 129.17,225.81 -315.42,672.02 -711.57,940.92 -396.25,268.85 -308.88,1037.14 -308.88,1037.14 0,0 -652.17,8004.39 -626.31,8469.07 25.92,464.48 213.64,409.43 213.64,409.43 0,0 264.09,-179.17 759.36,-515.27 495.23,-335.89 1041.23,-1236.74 1041.23,-1236.74 0,0 6870.65,-10375.29 7286.89,-10898.77 416.21,-523.54 995.25,-771.69 995.25,-771.69 0,0 4318.47,-1025.56 4959.87,-1075.05 641.5,-49.47 178.04,-554.78 178.04,-554.78z", "M159428.33 20870c0,0 -810.01,-259.39 -878.93,-861.48 -69.01,-602.09 -436.13,-1315.19 -944.42,-1411.19 -508.08,-96.01 -3074.19,190.93 -3074.19,190.93 0,0 -966.06,147.45 -1576.18,850.44 -610,702.85 -5351.18,5313.44 -5351.18,5313.44 0,0 -576.21,436.55 -111.48,1037.1 464.78,600.49 3919.28,3549.64 3919.28,3549.64 0,0 2327.41,442.48 2627.09,949.06 299.72,506.69 582.44,1146.59 1182.56,1420.72 599.95,274.28 20206.22,4720.71 21222.62,4912.83 1016.46,191.94 960.74,-595.79 938.49,-910.93 -22.31,-315.08 -481.2,-1206.3 -930.97,-1596.76 -449.86,-390.53 -14221.06,-12638.92 -14678.36,-13134.33 -457.18,-495.61 -1393.64,72.07 -2344.32,-309.46z", "M140254.29 54854.58c375.48,-432.52 1030.47,-478.92 1463.1,-103.41 432.56,375.37 478.86,1030.46 103.45,1463.06 -375.48,432.49 -1030.46,478.86 -1463.1,103.31 -432.56,-375.34 -478.82,-1030.33 -103.45,-1462.96zm5756.33 -35184.43l3591.33 -4626.46c311.7,-321.32 20.54,-705.54 -212.28,-513.09 -232.92,192.49 -3292.5,1369.15 -4297.38,1271.8 -311.82,-30.08 -552.02,97.99 -795.77,337.83 -1982.76,1950.26 -19432.91,19557.81 -20116.34,20238.01 -723.59,719.99 -1247.55,2270.69 -530.05,2959.27 717.57,688.44 6530.68,5733.91 8235.61,7443.89 1704.98,1710.05 7396.71,8524.18 7826.55,9127.54 429.84,603.21 892.71,676.07 892.71,676.07 0,0 5197.46,1815.17 5697.77,1920.63 500.22,105.35 325.44,-375.07 325.44,-375.07 0,0 -7302.84,-15412.85 -7625.11,-15988.61 -322.3,-575.56 -602.5,-555.8 -602.5,-555.8 0,0 -5421.45,-1746.5 -6086.67,-2192.31 -665.21,-445.82 137.61,-1761.08 517.48,-2231.25 379.97,-469.93 11284.93,-14813.86 11716.95,-15425.18 431.98,-611.43 118.16,-818.12 -167.01,-868.3 -285.17,-50.28 -787.53,-683.63 -905.69,-1608.1 -118.19,-924.64 44.56,-1787.24 947.73,-1956.84 903.34,-169.33 1312.91,1342.68 1260.24,1930.06 -52.56,587.41 326.98,435.9 326.98,435.9z", "M152649.58 34610.63c-433.88,499.97 -1190.99,553.51 -1691.01,119.49 -499.9,-433.88 -553.41,-1190.99 -119.46,-1691.01 433.93,-500.03 1191.07,-553.51 1691.05,-119.56 499.91,433.89 553.51,1191.07 119.42,1691.08zm24945.47 3499.22c-537.1,-167.59 -18034.15,-3794.62 -19080.8,-4063.06 -1046.61,-268.62 -2977.69,-451.77 -3555.08,-867.58 -577.5,-415.87 -1657.49,-1481.35 -1803.55,-1608.07 -145.99,-126.71 -344.78,-152.97 -344.78,-152.97l-18853.49 6961.19c0,0 -519.89,446.73 111.18,571.81 631.08,125.08 4797.79,1654.76 4797.79,1654.76 0,0 545.52,315.01 896.84,884.06 351.36,569.16 5945.3,11684.93 5945.3,11684.93 0,0 435.43,959 887.4,1351.33 451.95,392.3 693.04,601.51 693.04,601.51 0,0 179.96,76.92 260.61,-381.43 80.73,-458.15 380.79,-8483.51 380.79,-8483.51 0,0 177.78,-752.58 -183.9,-1066.44 -361.54,-313.75 -750.16,-809.57 -595.28,-1018.51 154.95,-208.98 1581.53,-635.03 1581.53,-635.03 0,0 5929.29,-1322.76 9454.78,-1846.03 3525.22,-523.21 5088.18,-702.24 6340.91,-425.44 1252.69,276.89 2477.82,487.09 2477.82,487.09 0,0 512.72,146.5 912.17,-18.8 399.32,-165.31 10005.85,-3173.55 10005.85,-3173.55 0,0 207.85,-288.79 -329.12,-456.27z", "M169136.88 41964.64c0,0 7926.9,-2554.8 8625.39,-2862.59 698.32,-307.86 1093,-913.22 1093,-913.22l13246.13 1668.02c3634.52,457.66 5195.51,-26.47 8619.05,-1927.51l17219.73 -9562.42 1688.96 3440.3c0,0 -7592.62,7546.8 -10838.73,10709.65 -3246.18,3162.83 -10402.92,11851.73 -10402.92,11851.73l-10598.37 5548.34c0,0 -784.97,-252.78 -569.08,-1000.11 215.89,-747.37 1750.03,-7357.47 1925.22,-8439.68 175.14,-1082.31 -1220.41,-2744.54 -2603.69,-3214.6 -1383.42,-470.17 -16897.06,-4475.5 -17419.38,-4544.78 -522.32,-69.05 -599.17,-663.89 14.68,-753.12z", "M212067.23 46672.64c-742.74,758.11 -1959.36,770.6 -2717.36,27.9 -758.13,-742.64 -770.67,-1959.26 -28.03,-2717.38 742.77,-758.07 1959.42,-770.6 2717.35,-27.97 758.2,742.77 770.64,1959.33 28.04,2717.45zm17500.17 -18856.45c-207.99,-547.26 133.59,-1071.1 -330.2,-1181.95 -463.7,-110.94 -13366.17,10371.81 -18087.11,15190.7 -4720.95,4818.84 -8693.27,12145.32 -8861.38,12667.37 -168.13,522.25 847.49,887.67 847.49,887.67 -435.16,-140.14 1277.89,565.06 1824.43,299.27 546.64,-265.8 3223.63,-1420.85 6565.04,-2611.59 3341.48,-1190.87 3086.34,-696.69 4949.67,-2248.07 1863.29,-1551.46 9779.76,-7704.17 10092.66,-8198.93 312.98,-494.69 10.25,-1821.5 148.48,-2430.04 138.46,-608.52 3248.39,-10267.99 2850.91,-12374.46z", "M50390.41 50086.52c-118.73,662.92 -752.51,1104.14 -1415.47,985.43 -663.04,-118.81 -1104.18,-752.51 -985.44,-1415.51 118.74,-663.03 752.48,-1104.14 1415.48,-985.37 662.92,118.72 1104.14,752.45 985.43,1415.45zm19950.07 -13610.09c0,0 -7516.13,-3264.94 -8021.93,-3515.45 -505.86,-250.46 -732.76,-273.35 -949.54,-649.77 -216.81,-376.3 -839.06,-274.58 -839.06,-274.58 0,0 -8907.05,731.77 -10448.52,1006.35 -1541.51,274.68 -4804.16,241.02 -6280.17,-147.8 -1475.9,-388.63 -4498.73,-1724.7 -4498.73,-1724.7 0,0 -16441.81,-9309.85 -16849.28,-9613.76 -407.32,-303.87 -627.05,29.85 -627.05,29.85l-1730.35 2816.78c0,0 -184.83,357.58 130.05,662.76l8860.69 8588.29c4098.97,3972.84 10187.47,11522.8 10906.33,12468.82 718.72,945.85 1860.81,1612.39 1860.81,1612.39 0,0 7533.14,4330.42 8378.81,4766.12 845.85,435.77 1025.9,499.56 1273.43,279.04 247.57,-220.38 269.57,-455.35 430.55,-909.64 161.02,-454.19 17.58,-1313.83 17.58,-1313.83 0,0 -1206.43,-5563.32 -1378.49,-6784.47 -172.19,-1221.04 330.13,-2339.05 1472.09,-2862.89 1142.05,-523.79 3544.32,-1141.65 5939.22,-1618.79 2394.88,-477.01 12090.66,-2240.07 12417.25,-2377 326.49,-136.9 -63.7,-437.71 -63.7,-437.71l0 0z", "M50390.41 50086.52c-118.73,662.92 -752.51,1104.14 -1415.47,985.43 -663.04,-118.81 -1104.18,-752.51 -985.44,-1415.51 118.74,-663.03 752.48,-1104.14 1415.48,-985.37 662.92,118.72 1104.14,752.45 985.43,1415.45zm19950.07 -13610.09c0,0 -7516.13,-3264.94 -8021.93,-3515.45 -505.86,-250.46 -732.76,-273.35 -949.54,-649.77 -216.81,-376.3 -839.06,-274.58 -839.06,-274.58 0,0 -8907.05,731.77 -10448.52,1006.35 -1541.51,274.68 -4804.16,241.02 -6280.17,-147.8 -1475.9,-388.63 -4498.73,-1724.7 -4498.73,-1724.7 0,0 -16441.81,-9309.85 -16849.28,-9613.76 -407.32,-303.87 -627.05,29.85 -627.05,29.85l-1730.35 2816.78c0,0 -184.83,357.58 130.05,662.76l8860.69 8588.29c4098.97,3972.84 10187.47,11522.8 10906.33,12468.82 718.72,945.85 1860.81,1612.39 1860.81,1612.39 0,0 7533.14,4330.42 8378.81,4766.12 845.85,435.77 1025.9,499.56 1273.43,279.04 247.57,-220.38 269.57,-455.35 430.55,-909.64 161.02,-454.19 17.58,-1313.83 17.58,-1313.83 0,0 -1206.43,-5563.32 -1378.49,-6784.47 -172.19,-1221.04 330.13,-2339.05 1472.09,-2862.89 1142.05,-523.79 3544.32,-1141.65 5939.22,-1618.79 2394.88,-477.01 12090.66,-2240.07 12417.25,-2377 326.49,-136.9 -63.7,-437.71 -63.7,-437.71", "M131554.55 100180.02l303.71 -796.08c57.39,-150.41 134.42,-381.46 615.18,-253.77 480.86,127.7 2697.01,819.18 2697.01,819.18 0,0 581.83,52.49 311.23,635 -270.59,582.61 -2510.04,4643.32 -4722.48,11266.61 -2212.3,6623.25 -5584.98,24464.33 -5584.98,24464.33 0,0 -378.54,891.89 -1085.17,1530.44 -706.59,638.64 -4751.19,3033.59 -4751.19,3033.59 0,0 -97.18,30.25 -320.6,62.13 -134.89,36.88 -281.62,58.39 -432.22,49.46l-31.98 -1.83 -32.6 2.18c-150.76,9.97 -297.91,-10.7 -433.22,-46.7 -223.18,-30.25 -320.46,-59.82 -320.46,-59.82 0,0 -4061.09,-2366.68 -4772.19,-3000.24 -711.06,-633.67 -1095.76,-1522.87 -1095.76,-1522.87 0,0 -3497.22,-17817.08 -5755.74,-24424.73 -2258.52,-6607.64 -4526.35,-10652.66 -4800.97,-11233.32 -274.64,-580.6 306.74,-637.18 306.74,-637.18 0,0 2211.28,-706.9 2691.23,-837.94 480.01,-131.04 558.49,99.39 616.97,249.4l309.23 793.97c164.93,362.97 -271.04,437.19 -579.58,565.48 -308.44,128.27 -1305.55,858.79 -974.23,2057.18 331.3,1198.36 1566.44,994.09 1930.13,1047.37 363.73,53.24 527.46,-96.29 674.04,248.51 146.61,344.75 643.14,2218.65 1009.72,3089.69 889.75,2114.71 4244.25,3409.4 6337.94,3776.43l1045.52 18370.82 -790.7 -18262.74c1763.36,331.36 2993.53,674.89 4529.7,678.08 1538.13,-13.35 2766.6,-365.87 4529.24,-709.66l-663.27 18267.79 917.24 -18377.77c2091.12,-381.53 5436.43,-1699.66 6311.47,-3820.53 360.45,-873.65 843.91,-2750.8 988.13,-3096.71 144.12,-345.8 308.91,-197.43 672.22,-253.15 363.32,-55.87 1599.86,139.79 1922.84,-1060.89 322.92,-1200.67 -679.17,-1924.13 -988.59,-2050.3 -309.43,-126.13 -745.87,-197.25 -583.53,-561.38z", "M121850.7 79280.8c-2.02,-55.66 251.41,-3180.54 1506.59,-6122.91 1255.15,-2942.4 8596.95,-18356.1 8596.95,-18356.1 0,0 413.05,-56.75 289.64,945.27 -123.55,1002.15 14.3,5738.23 -16.15,6439.31 -30.42,700.77 -271.03,2091.28 -949.49,3583.32 -678.6,1492.08 -1469.36,3472.08 -1469.36,3472.08l1706.4 -3861.01c350.55,-793.28 567.8,-1612.18 708.92,-2413.85 67.58,-384.56 101.78,-900.88 89.82,-1231.46 -19.31,-537.21 264.98,-7362.03 264.98,-7362.03 0,0 116.63,-849.9 560.29,-131.07 443.7,718.52 4213.66,6939.48 4213.66,6939.48 0,0 422.92,427.55 -72.11,894.79 -494.96,467.23 -1819.7,1198.28 -3985.98,4364.55 -2166.32,3166.1 -4717.45,7091.1 -5991.63,10799.41 -1274.01,3708.16 -1163.42,3910.19 -1211.47,4514.36 -48.07,604.1 39.4,940.23 192.28,1657.48 152.64,716.93 592.46,2106.99 181.55,3537.14 -411,1430.22 -412.43,1698.67 -1415.24,4938.54 -1002.94,3239.67 -1865.82,5450.71 -2069.72,5897.24 -203.9,446.49 -430.48,915.19 -767.6,1181.94 -251.29,198.56 -2319.27,1453.87 -3359.91,2082.29 -132.17,98.61 -242.69,184.48 -314.43,247.29 -189.73,165.45 -389.57,193.07 -542.86,179.11 -153.46,12.36 -353.06,-17.58 -540.78,-185.27 -71.12,-63.43 -180.8,-150.66 -312.05,-250.77 -1033.26,-640.07 -3087.2,-1918.3 -3335.96,-2119.65 -334.29,-270.53 -555.49,-741.82 -754.43,-1190.36 -198.89,-448.84 -1036.83,-2669.45 -2003.7,-5920.23 -966.45,-3250.67 -964.93,-3519.25 -1359.99,-4953.87 -394.79,-1434.75 60.67,-2819.81 221.37,-3535.06 160.64,-715.31 252.1,-1050.56 210.75,-1655.24 -41.46,-604.54 71.5,-805.37 -1160.93,-4527.61 -1232.59,-3722.27 -3739.68,-7675.41 -5870.4,-10865.59 -2130.89,-3190.21 -3447.24,-3936.18 -3937,-4408.93 -489.72,-472.69 -62.09,-895.68 -62.09,-895.68 0,0 3839.52,-6178.07 4290.85,-6891.86 451.84,-713.68 558.89,137.34 558.89,137.34 0,0 208.03,6827.65 182.75,7364.55 -15.7,330.31 12.71,847.17 76.06,1232.42 132.14,803.34 340.09,1624.36 681.8,2421.52l1663.11 3880.01c0,0 -768.73,-1988.64 -1430.26,-3488.35 -661.8,-1499.55 -887.02,-2892.67 -909.53,-3593.82 -22.56,-701.15 168.2,-5435.52 55.99,-6438.94 -112.47,-1003.38 300.2,-942.06 300.2,-942.06 0,0 7168.79,15494.9 8390.93,18451.07 1222.28,2956.23 1440.69,6083.9 1438.1,6139.36 127.18,839.74 752.3,1111.91 827.21,-275.46 74.97,-1387.34 -584.59,-7523.6 -1256.33,-11466.49 -671.76,-3942.96 -1185.56,-8153.68 -1470.86,-9140.1 -285.38,-986.22 674.47,-533.39 674.47,-533.39 0,0 2924.01,1404 3594.2,1654.06 545.82,203.45 898.47,391.11 1470.04,456.26 572.19,-58.75 926.98,-242.45 1474.88,-439.88 672.88,-242.39 3612.55,-1613.69 3612.55,-1613.69 0,0 964.9,-442.27 668.35,540.94 -296.31,983.05 -857.02,5187.85 -1572.84,9123.05 -715.86,3935.22 -1443.95,10063.72 -1384.62,11451.77 59.27,1388.06 687.62,1122.91 824.15,284.8z", "M111053.66 101.35c0,0 2270.08,1517.46 5057.22,2822.67 2662.96,1247.28 4857.11,2099.39 5834.74,2177.16 978.49,-67.08 3181.96,-894.49 5858.64,-2111.76 2801.46,-1273.94 5088.32,-2765.86 5088.32,-2765.86 0,0 773.19,133.26 1203.13,135.64 429.9,2.49 556.07,476.03 556.07,476.03 0,0 2021.76,7491.78 2019.34,7921.62 -0.44,61.96 -4.22,121.09 -10.59,177.19l9.54 37.71c0,0 -7.19,15.01 -20.64,42.23 -47.24,287.83 -154.33,472.89 -154.33,472.89 0,0 -2210.2,3168.96 -5662.38,5471.05 -1055.02,703.63 -2218.12,1358.32 -3347.92,1926.89 -2043.59,1178.54 -3690.83,1725.61 -4729.9,1957.51 -373.94,106.14 -651.42,159.01 -801.09,150.25 -26.47,-1.53 -55.25,-3.75 -85.77,-6.4 -30.75,2.21 -59.54,4.12 -86.24,5.52 -149.78,6.85 -426.94,-49.16 -799.99,-159.52 -1036.53,-243.58 -2676.82,-808.99 -4706.55,-2009.9 -1123.66,-581.35 -2279.34,-1248.87 -3326.5,-1964.33 -2258.46,-1542.94 -3973.1,-3456.37 -4879.34,-4581.36 -94.22,-99.66 -168,-181.31 -219.64,-242.11 -145.41,-171.85 -262.49,-344.82 -355.24,-504.81 -96.6,-132.4 -146.57,-205.84 -146.57,-205.84 0,0 -92.28,-163.27 -139.97,-420.82 -20.36,-61.31 -29.29,-96.12 -29.29,-96.12l9.98 -37.77c-5.73,-55.96 -9.03,-115.37 -8.85,-177.23 2.59,-429.74 2107.96,-7898.56 2107.96,-7898.56 0,0 131.56,-472.14 561.56,-469.76 429.67,2.53 1204.32,-122.21 1204.32,-122.21z", "M160829.14 98447.27c-42.27,852.96 -652.72,1747.66 -2022.65,1944.44 -1370,196.71 -11264.33,600.35 -11264.33,600.35 0,0 -1148.93,34.27 -1166.91,-645.25 -17.95,-679.48 9.33,-15211.17 9.33,-15211.17 0,0 126.55,-1137.86 969.02,-2355.8 842.51,-1217.98 1001.44,-1417.08 3072.18,-5005.27 2070.81,-3588.37 3224.17,-6044.6 3224.17,-6044.6 0,0 497.25,-1128.6 1708.28,-1126.28 1210.92,2.21 2159.17,-400.96 2372.67,17.37 213.53,418.29 739.26,1229.46 837.36,2624.87 98.1,1395.58 72.04,2717.96 166.74,3693.34 94.56,975.39 508.86,1762.78 1257.42,2621.51 748.53,858.79 1411.22,1792.28 1411.22,1792.28 0,0 671.89,562.78 554.24,2751.03 -117.72,2188.06 -1128.74,14343.19 -1128.74,14343.19z", "M189500.62 99754.55c22.85,853.68 612.65,1762.2 1977.68,1990.21 1365.19,227.98 9033.08,724.41 9033.08,724.41 0,0 1147.71,60.49 1181.36,-618.37 33.52,-678.94 338.42,-15207.46 338.42,-15207.46 0,0 -100.42,-1140.49 -914.86,-2377.41 -814.41,-1236.95 -968.68,-1439.55 -2956.99,-5074.28 -1988.06,-3634.66 -3091.93,-5522.14 -3091.93,-5522.14 0,0 -262.93,-635.51 -900.18,-967.99l-61.65 5388.55c-4.97,430.96 -361.64,779.66 -792.67,774.82 -431,-5.01 -779.63,-361.68 -774.79,-792.7l63.36 -5528.34c-746.59,99.19 -1184.56,318.76 -1380.97,682.78 -196.44,364.06 -593.91,241.3 -723.9,1634.19 -129.98,1392.85 -134.14,2715.58 -251.04,3688.47 -116.91,973 -549.12,1750.79 -1317.13,2592.07 -767.98,841.39 -1825.87,1376.99 -1825.87,1376.99 0,0 -684.52,547.25 -616.84,2737.55 20.03,651.96 156.28,1919.47 257.51,3756.67 21.9,399.29 246.17,813.08 611.62,1024.81 781.61,452.96 1730.35,538.73 1748.41,1696.73 59.02,3809.36 397.37,8020.43 397.37,8020.43z", "M27452.54 50733.93c-118.77,662.96 -752.55,1104.18 -1415.51,985.44 -663.03,-118.78 -1104.14,-752.52 -985.4,-1415.48 118.74,-663.03 752.48,-1104.17 1415.48,-985.37 662.92,118.72 1104.14,752.45 985.43,1415.41zm-2763.64 -12707.5c-1174.04,-1952.3 -2617.89,-3979.65 -2916.55,-4237.97 -298.53,-258.4 -397.37,-289.95 -397.37,-289.95 0,0 -463.19,189.84 -781.81,404.06 -318.49,214.15 -53.51,407.36 -53.51,407.36 0,0 5206.35,8221.88 5292.46,8771.68 85.97,549.84 -441.72,327.3 -441.72,327.3 0,0 -3129.38,-5448.57 -3497.49,-6001.23 -368.22,-552.67 -1113.55,-365.63 -1309.55,181.46 -196.07,546.98 -2055.34,4264.85 -2330.91,4753.92 -275.42,489.11 -811.03,666.75 -1179.08,114.15 -368.25,-552.7 -772.13,-1334.48 -1309.02,-3714.94 -536.83,-2380.54 -566.57,-3627.37 -584.59,-4485.51l-58.66 -2789.73c-13.8,-656.46 -438.58,-913.56 -1196.99,-1208.92 -4339.65,-1690.19 -8470.37,-3616.6 -12667.41,-5628.79 -811.98,-389.3 -1155.85,-54.63 -1155.85,-54.63 0,0 322.44,3112.71 476.88,4223.77 182,1309.75 299.51,1714.2 1635.52,5093.36 1317.61,3332.63 3784.94,7387.93 4645.98,8990.2 861.01,1602.14 1814.18,2743.92 2896.04,3208.36 1081.97,464.35 4306.55,2003.61 8466.94,3520.38 4256.92,1552.04 7578.98,2895.26 8275.63,2997.52 696.68,102.18 2806.12,-738.04 2806.12,-738.04 0,0 613.13,-249.78 1488.84,-786.44 726.97,-445.58 751.43,-1197.37 751.43,-1197.37 0,0 -5681.42,-9907.92 -6855.32,-11859.99z"];
+const ZONES = [{"id": "front-fender", "label": "Front Fender", "idxs": [12]}, {"id": "left-shroud", "label": "Left Shroud", "idxs": [15, 8, 0, 2, 1]}, {"id": "right-shroud", "label": "Right Shroud", "idxs": [4, 3, 5, 6, 7]}, {"id": "rear-fender", "label": "Rear Fender / Tail", "idxs": [10, 11]}, {"id": "left-fork-guard", "label": "Left Fork Guard", "idxs": [13]}, {"id": "right-fork-guard", "label": "Right Fork Guard", "idxs": [14]}];
+
+// ── Order storage (Supabase) ────────────────────────────────────────────────
+// The browser holds only the publishable key. Row-level security lets it INSERT
+// an order and nothing else: it cannot read other orders, and it cannot mark an
+// order paid — that is done server-side from a verified Stripe webhook.
+const SUPABASE_URL = "https://ohcclvcjdbftlnyrrzvt.supabase.co";
+const SUPABASE_KEY = "sb_publishable_-u9yj16rZFqBZoQBkeLAQA_HTFbTtOf";
+
+async function saveOrder(record){
+  const res = await fetch(SUPABASE_URL + "/rest/v1/crf_orders", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + SUPABASE_KEY,
+      "Prefer": "return=minimal",
+    },
+    body: JSON.stringify({
+      id: record.id,
+      model: record.model,
+      fulfilment: record.fulfilment,
+      customer_name: record.name,
+      customer_email: record.email,
+      notes: record.notes || null,
+      zones: record.zones || {},
+      download_token: record.downloadToken,
+    }),
+  });
+  if(!res.ok){
+    const detail = await res.text().catch(() => "");
+    throw new Error("Order could not be saved (" + res.status + ") " + detail.slice(0, 200));
+  }
+  return true;
+}
+
+// Deposit the finished SVG server-side. The browser can write it but never read
+// it back — release is the kit-download function's job, and only once Stripe has
+// confirmed the order paid.
+async function storeOrderFile(orderId, svg){
+  const res = await fetch(SUPABASE_URL + "/rest/v1/crf_order_files", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + SUPABASE_KEY,
+      "Prefer": "return=minimal",
+    },
+    body: JSON.stringify({ order_id: orderId, svg: svg }),
+  });
+  if(!res.ok){
+    const detail = await res.text().catch(() => "");
+    throw new Error("Kit file could not be stored (" + res.status + ") " + detail.slice(0, 200));
+  }
+  return true;
+}
+
+// Ask the server for the finished file. Returns the SVG only for a paid order.
+const DOWNLOAD_FN = SUPABASE_URL + "/functions/v1/kit-download";
+async function fetchPaidFile(orderId, token){
+  const res = await fetch(DOWNLOAD_FN, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ order_id: orderId, token: token }),
+  });
+  if(res.status === 402) return { paid: false };
+  if(!res.ok){
+    const detail = await res.text().catch(() => "");
+    throw new Error("Download failed (" + res.status + ") " + detail.slice(0, 160));
+  }
+  return { paid: true, svg: await res.text() };
+}
+
+// Stripe Payment Links, created in the Stripe dashboard. Only the file is on
+// sale: printing and shipping physical kits is on hold, so there is no
+// physical link to keep in step.
+const STRIPE_LINKS = {
+  digital: "https://buy.stripe.com/eVqcN5b26gARfoIaCEc7u0e",
+};
+
+function stripeLinkFor(fulfilment, orderId){
+  const base = (STRIPE_LINKS[fulfilment] || "").trim();
+  if(!base) return null;
+  const sep = base.includes("?") ? "&" : "?";
+  return base + sep + "client_reference_id=" + encodeURIComponent(orderId);
+}
+
+const [VB_X, VB_Y, VB_W, VB_H] = VIEWBOX.split(' ').map(Number);
+
+const state = {
+  selectedZone: null,
+  designs: {}, // zoneId -> {img, natW, natH, baseScale, panX, panY, rot, scaleMult}
+  zoneBBox: {}, // zoneId -> {x,y,w,h}
+  staged: {},   // zoneId -> [dataUrl, ...] images picked but not yet finalized into a design
+};
+
+function pathsFor(zone){ return zone.idxs.map(i => PATHS[i]); }
+
+function buildOverview(){
+  const svg = document.getElementById('overview-svg');
+  const ns = 'http://www.w3.org/2000/svg';
+  const defs = document.createElementNS(ns,'defs');
+  svg.appendChild(defs);
+  ZONES.forEach(zone => {
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('class','zone-group');
+    g.setAttribute('data-zone', zone.id);
+    pathsFor(zone).forEach(d => {
+      const p = document.createElementNS(ns,'path');
+      p.setAttribute('d', d);
+      p.setAttribute('class','zone-shape');
+      g.appendChild(p);
+    });
+    g.addEventListener('click', () => selectZone(zone.id));
+    svg.appendChild(g);
+    // compute bbox now that it's in the DOM
+    const bb = g.getBBox();
+    state.zoneBBox[zone.id] = {x:bb.x, y:bb.y, w:bb.width, h:bb.height};
+  });
+}
+
+// Mirrors a zone's current design into the overview map, so the map doubles
+// as a live "assembled kit" preview built from the real cut geometry —
+// no bike photo involved, so nothing here depends on image rights.
+function updateOverviewZone(zoneId){
+  updateBikeZone(zoneId);
+  const ns = 'http://www.w3.org/2000/svg';
+  const design = state.designs[zoneId];
+  const g = document.querySelector('.zone-group[data-zone="'+zoneId+'"]');
+  if(!g) return;
+  let previewGroup = g.querySelector('.zone-preview');
+  let edgeGroup = g.querySelector('.zone-edge-group');
+
+  if(!design){
+    if(previewGroup) previewGroup.remove();
+    if(edgeGroup) edgeGroup.remove();
+    return;
+  }
+
+  const svg = document.getElementById('overview-svg');
+  let defs = svg.querySelector('defs');
+  let clip = defs.querySelector('#ov-clip-'+zoneId);
+  if(!clip){
+    clip = document.createElementNS(ns,'clipPath');
+    clip.setAttribute('id','ov-clip-'+zoneId);
+    clip.setAttribute('clipPathUnits','userSpaceOnUse');
+    pathsFor(ZONES.find(z=>z.id===zoneId)).forEach(d=>{
+      const p = document.createElementNS(ns,'path');
+      p.setAttribute('d', d);
+      clip.appendChild(p);
+    });
+    defs.appendChild(clip);
+  }
+
+  if(!previewGroup){
+    previewGroup = document.createElementNS(ns,'g');
+    previewGroup.setAttribute('class','zone-preview');
+    previewGroup.setAttribute('clip-path','url(#ov-clip-'+zoneId+')');
+    previewGroup.style.pointerEvents = 'none';
+    const imgGrp = document.createElementNS(ns,'g');
+    imgGrp.setAttribute('class','ov-img-group');
+    const img = document.createElementNS(ns,'image');
+    img.setAttribute('class','ov-image');
+    img.setAttribute('x',0); img.setAttribute('y',0);
+    imgGrp.appendChild(img);
+    previewGroup.appendChild(imgGrp);
+    g.appendChild(previewGroup);
+  }
+  if(!edgeGroup){
+    edgeGroup = document.createElementNS(ns,'g');
+    edgeGroup.setAttribute('class','zone-edge-group');
+    edgeGroup.style.pointerEvents = 'none';
+    pathsFor(ZONES.find(z=>z.id===zoneId)).forEach(d=>{
+      const outline = document.createElementNS(ns,'path');
+      outline.setAttribute('d', d);
+      outline.setAttribute('class','zone-edge');
+      edgeGroup.appendChild(outline);
+    });
+    g.appendChild(edgeGroup);
+  }
+
+  const img = previewGroup.querySelector('.ov-image');
+  img.setAttribute('width', design.natW);
+  img.setAttribute('height', design.natH);
+  img.setAttribute('href', design.img);
+  img.setAttributeNS('http://www.w3.org/1999/xlink','href', design.img);
+
+  const imgGrp = previewGroup.querySelector('.ov-img-group');
+  const bbox = state.zoneBBox[zoneId];
+  const cx = bbox.x + bbox.w/2, cy = bbox.y + bbox.h/2;
+  const s = design.baseScale * design.scaleMult;
+  imgGrp.setAttribute('transform',
+    `translate(${design.panX},${design.panY}) translate(${cx},${cy}) rotate(${design.rot}) scale(${s}) translate(${-design.natW/2},${-design.natH/2})`);
+}
+
+// ── On-bike preview ─────────────────────────────────────────────────────────
+// A CRF250L side profile drawn from primitives, with the right-side panels
+// placed where they sit on the bike. Each panel keeps its real cut outline and
+// its share of the design; only its position and scale change, so what you see
+// is the same geometry that gets cut.
+// ── On-bike preview ─────────────────────────────────────────────────────────
+// A panel is cut flat, which is a 2D unwrap of a 3D part -- you cannot rotate a
+// cut outline into a side view and get the shape the eye expects. So the bike
+// view carries its own silhouettes, drawn as the panel appears from the side,
+// and the artwork is laid across them as one piece. The panel map above stays
+// the authority on what actually gets cut; this is what it will look like.
+const BIKE_SIDE = {
+  "front-fender":     "M700,262 Q790,232 892,228 L898,248 Q792,254 706,282 Z",
+  "right-shroud":     "M534,266 Q620,244 704,252 L710,306 Q622,296 540,318 Z",
+  "rear-fender":      "M300,248 Q230,234 152,238 L146,266 Q226,262 296,276 Z",
+  "right-fork-guard": "M766,296 L788,292 L800,398 L778,404 Z",
+};
+
+function bikeChassis(ns){
+  const frag = document.createDocumentFragment();
+  const add = (tag, attrs, cls) => {
+    const el = document.createElementNS(ns, tag);
+    for(const k in attrs) el.setAttribute(k, attrs[k]);
+    if(cls) el.setAttribute('class', cls);
+    frag.appendChild(el);
+    return el;
+  };
+
+  // 21" front and 18" rear on knobblies. The size difference is most of what
+  // separates a dual-sport silhouette from a pushbike.
+  [[800,428,142],[238,442,126]].forEach(([cx,cy,r])=>{
+    add('circle',{cx,cy,r:r-14},'bike-tyre');
+    add('circle',{cx,cy,r:r-32},'bike-rim');
+    add('circle',{cx,cy,r:r-40},'bike-rim');
+    add('circle',{cx,cy,r:18},'bike-hub');
+    for(let a=0; a<180; a+=22.5){
+      const rad = a*Math.PI/180, rr = r-42;
+      add('line',{x1:cx-rr*Math.cos(rad), y1:cy-rr*Math.sin(rad),
+                  x2:cx+rr*Math.cos(rad), y2:cy+rr*Math.sin(rad)},'bike-spoke');
+    }
+  });
+  add('circle',{cx:800,cy:428,r:46},'bike-disc');
+  add('circle',{cx:238,cy:442,r:40},'bike-disc');
+
+  // Swingarm and chain run
+  add('path',{d:'M452,404 L238,442 L238,456 L456,420 Z'},'bike-fill');
+  add('path',{d:'M470,398 L238,428'},'bike-thin');
+  add('path',{d:'M466,424 L240,456'},'bike-thin');
+
+  // Engine: cases, barrel and head as one solid mass slung low and forward
+  add('path',{d:'M448,338 L604,330 L626,392 L612,458 L470,464 L430,404 Z'},'bike-mass');
+  add('path',{d:'M474,296 L586,292 L600,336 L462,342 Z'},'bike-mass');
+  add('path',{d:'M486,268 L566,264 L578,296 L478,300 Z'},'bike-mass');
+  add('path',{d:'M456,452 L616,446 L604,470 L470,474 Z'},'bike-fill');   // sump
+  add('path',{d:'M446,470 Q540,492 626,462 L622,478 Q538,506 444,484 Z'},'bike-fill'); // bash plate
+
+  // Frame: backbone, downtube, cradle, subframe
+  add('path',{d:'M744,232 L588,318'},'bike-tube');
+  add('path',{d:'M588,318 L556,420 L482,466'},'bike-tube');
+  add('path',{d:'M740,244 L520,278'},'bike-tube');
+  add('path',{d:'M520,278 L470,404'},'bike-tube');
+  add('path',{d:'M520,276 L268,262'},'bike-tube');
+  add('path',{d:'M300,268 L452,406'},'bike-thin');
+  add('path',{d:'M500,290 L468,398'},'bike-line');   // shock body
+
+  // Forks: thin uppers into fat lowers, plus the triple clamps
+  add('path',{d:'M756,214 L792,404'},'bike-line');
+  add('path',{d:'M774,212 L810,402'},'bike-line');
+  add('path',{d:'M786,336 L820,334 L830,432 L796,436 Z'},'bike-fill');
+  add('path',{d:'M744,206 L788,198'},'bike-tube');
+  add('path',{d:'M750,232 L794,224'},'bike-tube');
+  add('path',{d:'M736,186 L812,170'},'bike-tube');   // handlebar
+
+  // Tank and the long flat seat
+  add('path',{d:'M548,266 Q636,242 706,258 L712,304 Q632,286 546,304 Z'},'bike-fill');
+  add('path',{d:'M280,242 Q396,230 522,266 L516,292 Q394,256 284,268 Z'},'bike-mass');
+
+  // Exhaust: header off the head, up and back to the tail
+  add('path',{d:'M596,300 Q660,330 612,368 Q470,352 342,296'},'bike-pipe');
+  return frag;
+}
+
+// Union of the side-view panels, so one image can be laid over the bike the
+// same way it is laid over the cut sheet.
+let bikeUnion = null;
+function bikeBBox(svg){
+  if(bikeUnion) return bikeUnion;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  svg.querySelectorAll('.bike-zone > .bike-panel-blank').forEach(p=>{
+    const b=p.getBBox();
+    x0=Math.min(x0,b.x); y0=Math.min(y0,b.y);
+    x1=Math.max(x1,b.x+b.width); y1=Math.max(y1,b.y+b.height);
+  });
+  bikeUnion={x:x0,y:y0,w:x1-x0,h:y1-y0};
+  return bikeUnion;
+}
+
+function buildBikePreview(){
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.getElementById('bike-svg');
+  svg.innerHTML = '';
+  bikeUnion = null;
+  const defs = document.createElementNS(ns,'defs');
+  svg.appendChild(defs);
+  svg.appendChild(bikeChassis(ns));
+
+  Object.keys(BIKE_SIDE).forEach(zoneId=>{
+    const d = BIKE_SIDE[zoneId];
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('class','bike-zone');
+    g.setAttribute('data-zone', zoneId);
+    g.style.cursor = 'pointer';
+    g.addEventListener('click', ()=> selectZone(zoneId));
+
+    const clip = document.createElementNS(ns,'clipPath');
+    clip.setAttribute('id','bike-clip-'+zoneId);
+    clip.setAttribute('clipPathUnits','userSpaceOnUse');
+    const cp = document.createElementNS(ns,'path');
+    cp.setAttribute('d', d);
+    clip.appendChild(cp);
+    defs.appendChild(clip);
+
+    const blank = document.createElementNS(ns,'path');
+    blank.setAttribute('d', d);
+    blank.setAttribute('class','bike-panel-blank');
+    g.appendChild(blank);
+
+    const art = document.createElementNS(ns,'g');
+    art.setAttribute('class','bike-art');
+    art.setAttribute('clip-path','url(#bike-clip-'+zoneId+')');
+    g.appendChild(art);
+
+    const edge = document.createElementNS(ns,'path');
+    edge.setAttribute('d', d);
+    edge.setAttribute('class','bike-panel-edge');
+    g.appendChild(edge);
+
+    svg.appendChild(g);
+  });
+}
+
+function updateBikeZone(zoneId){
+  const g = document.querySelector('.bike-zone[data-zone="'+zoneId+'"]');
+  if(!g) return;
+  const art = g.querySelector('.bike-art');
+  art.innerHTML = '';
+  const design = state.designs[zoneId];
+  if(!design) return;
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.getElementById('bike-svg');
+  const u = bikeBBox(svg);
+  // Cover the whole bike with the image, so the artwork reads as one design
+  // running across the panels rather than four separate crops.
+  const sc = Math.max(u.w/design.natW, u.h/design.natH);
+  const grp = document.createElementNS(ns,'g');
+  grp.setAttribute('transform',
+    `translate(${u.x+u.w/2},${u.y+u.h/2}) scale(${sc}) translate(${-design.natW/2},${-design.natH/2})`);
+  const img = document.createElementNS(ns,'image');
+  img.setAttribute('x',0); img.setAttribute('y',0);
+  img.setAttribute('width', design.natW);
+  img.setAttribute('height', design.natH);
+  img.setAttribute('href', design.img);
+  img.setAttributeNS('http://www.w3.org/1999/xlink','href', design.img);
+  grp.appendChild(img);
+  art.appendChild(grp);
+}
+
+function buildZoneList(){
+  const list = document.getElementById('zone-list');
+  list.innerHTML = '';
+  ZONES.forEach(zone => {
+    const chip = document.createElement('div');
+    chip.className = 'zone-chip';
+    chip.id = 'chip-' + zone.id;
+    chip.innerHTML = `<span class="dot"></span><span class="name">${zone.label}</span><span class="status">Empty</span>`;
+    chip.addEventListener('click', () => selectZone(zone.id));
+    list.appendChild(chip);
+  });
+}
+
+function refreshZoneStatus(){
+  ZONES.forEach(zone => {
+    const has = !!state.designs[zone.id];
+    const g = document.querySelector('.zone-group[data-zone="'+zone.id+'"]');
+    const chip = document.getElementById('chip-'+zone.id);
+    if(g){
+      g.classList.toggle('has-design', has);
+      g.classList.toggle('selected', state.selectedZone === zone.id);
+    }
+    if(chip){
+      chip.classList.toggle('done', has);
+      chip.classList.toggle('selected', state.selectedZone === zone.id);
+      chip.querySelector('.status').textContent = has ? 'Designed' : 'Empty';
+    }
+  });
+  refreshOrderState();
+}
+
+function zoneLabel(id){
+  const z = ZONES.find(z=>z.id===id);
+  return z ? z.label : id;
+}
+
+// User-supplied text (name, email, notes) must never go into innerHTML unescaped —
+// this is what stops a malicious order from running script in anyone else's
+// browser when they open the shared "submitted orders" panel.
+function escapeHTML(str){
+  return String(str).replace(/[&<>"']/g, ch => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[ch]));
+}
+
+function selectZone(id){
+  state.selectedZone = id;
+  document.getElementById('ws-heading').textContent = zoneLabel(id);
+  renderWorkspace();
+  refreshZoneStatus();
+}
+
+function renderWorkspace(){
+  const id = state.selectedZone;
+  const body = document.getElementById('ws-body');
+  const hint = document.getElementById('ws-hint');
+  body.innerHTML = '';
+  if(!id){
+    hint.textContent = 'Select a panel on the left to start.';
+    body.innerHTML = '<div class="ws-empty">Choose a panel from the map to begin designing.</div>';
+    return;
+  }
+  const design = state.designs[id];
+  if(!design){
+    hint.textContent = 'Upload one image, or several to blend into one design.';
+    renderStagingUI(id, body);
+    return;
+  }
+
+  hint.textContent = 'Drag to reposition. The preview is clipped to the real panel outline.';
+
+  const bbox = state.zoneBBox[id];
+  const padX = bbox.w * 0.1, padY = bbox.h * 0.1;
+  const vb = `${bbox.x-padX} ${bbox.y-padY} ${bbox.w+2*padX} ${bbox.h+2*padY}`;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'ws-canvas-wrap';
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns,'svg');
+  svg.setAttribute('viewBox', vb);
+  svg.setAttribute('id','ws-svg');
+
+  const defs = document.createElementNS(ns,'defs');
+  const clip = document.createElementNS(ns,'clipPath');
+  clip.setAttribute('id','ws-clip');
+  clip.setAttribute('clipPathUnits','userSpaceOnUse');
+  pathsFor(ZONES.find(z=>z.id===id)).forEach(d=>{
+    const p = document.createElementNS(ns,'path');
+    p.setAttribute('d', d);
+    clip.appendChild(p);
+  });
+  defs.appendChild(clip);
+  svg.appendChild(defs);
+
+  // plastic background clipped to shape
+  const bg = document.createElementNS(ns,'g');
+  bg.setAttribute('clip-path','url(#ws-clip)');
+  const bgRect = document.createElementNS(ns,'rect');
+  bgRect.setAttribute('x', bbox.x); bgRect.setAttribute('y', bbox.y);
+  bgRect.setAttribute('width', bbox.w); bgRect.setAttribute('height', bbox.h);
+  bgRect.setAttribute('fill', '#3a3d44');
+  bg.appendChild(bgRect);
+  svg.appendChild(bg);
+
+  // clipped image group
+  const clippedGroup = document.createElementNS(ns,'g');
+  clippedGroup.setAttribute('clip-path','url(#ws-clip)');
+  const imgGroup = document.createElementNS(ns,'g');
+  imgGroup.setAttribute('id','ws-img-group');
+  const img = document.createElementNS(ns,'image');
+  img.setAttribute('id','ws-image');
+  img.setAttribute('x', 0); img.setAttribute('y', 0);
+  img.setAttribute('width', design.natW); img.setAttribute('height', design.natH);
+  img.setAttributeNS('http://www.w3.org/1999/xlink','href', design.img);
+  img.setAttribute('href', design.img);
+  imgGroup.appendChild(img);
+  clippedGroup.appendChild(imgGroup);
+  svg.appendChild(clippedGroup);
+
+  // outline on top for reference
+  pathsFor(ZONES.find(z=>z.id===id)).forEach(d=>{
+    const outline = document.createElementNS(ns,'path');
+    outline.setAttribute('d', d);
+    outline.setAttribute('fill','none');
+    outline.setAttribute('stroke', '#e2231a');
+    outline.setAttribute('stroke-width', Math.max(bbox.w,bbox.h)*0.006);
+    svg.appendChild(outline);
+  });
+
+  // drag catcher
+  const catcher = document.createElementNS(ns,'rect');
+  catcher.setAttribute('x', bbox.x-padX); catcher.setAttribute('y', bbox.y-padY);
+  catcher.setAttribute('width', bbox.w+2*padX); catcher.setAttribute('height', bbox.h+2*padY);
+  catcher.setAttribute('fill', 'transparent');
+  svg.appendChild(catcher);
+
+  wrap.appendChild(svg);
+  body.appendChild(wrap);
+
+  applyImageTransform();
+  attachDrag(svg, wrap, id);
+
+  // controls
+  const controls = document.createElement('div');
+  controls.className = 'controls';
+  controls.innerHTML = `
+    <div class="ctrl-row">
+      <label><span>Size</span><span id="scale-val"></span></label>
+      <input type="range" id="ctrl-scale" min="0.4" max="3" step="0.01">
+    </div>
+    <div class="ctrl-row">
+      <label><span>Rotate</span><span id="rot-val"></span></label>
+      <input type="range" id="ctrl-rot" min="-45" max="45" step="1">
+    </div>
+    <div class="btn-row">
+      <button class="btn-sm" id="btn-fit">Fit to panel</button>
+      <button class="btn-sm" id="btn-replace">Replace image</button>
+      <button class="btn-sm danger" id="btn-remove">Remove</button>
+    </div>
+  `;
+  body.appendChild(controls);
+
+  const scaleInput = controls.querySelector('#ctrl-scale');
+  const rotInput = controls.querySelector('#ctrl-rot');
+  scaleInput.value = design.scaleMult;
+  rotInput.value = design.rot;
+  document.getElementById('scale-val').textContent = Math.round(design.scaleMult*100)+'%';
+  document.getElementById('rot-val').textContent = design.rot+'\u00b0';
+
+  scaleInput.addEventListener('input', e=>{
+    design.scaleMult = parseFloat(e.target.value);
+    document.getElementById('scale-val').textContent = Math.round(design.scaleMult*100)+'%';
+    applyImageTransform();
+  });
+  rotInput.addEventListener('input', e=>{
+    design.rot = parseFloat(e.target.value);
+    document.getElementById('rot-val').textContent = design.rot+'\u00b0';
+    applyImageTransform();
+  });
+  controls.querySelector('#btn-fit').addEventListener('click', ()=>{
+    design.panX = 0; design.panY = 0; design.scaleMult = 1; design.rot = 0;
+    scaleInput.value = 1; rotInput.value = 0;
+    document.getElementById('scale-val').textContent = '100%';
+    document.getElementById('rot-val').textContent = '0\u00b0';
+    applyImageTransform();
+  });
+  controls.querySelector('#btn-replace').addEventListener('click', ()=>{
+    const inp = document.createElement('input');
+    inp.type='file'; inp.accept='image/*';
+    inp.addEventListener('change', e=>handleUpload(id, e.target.files[0]));
+    inp.click();
+  });
+  controls.querySelector('#btn-remove').addEventListener('click', ()=>{
+    delete state.designs[id];
+    updateOverviewZone(id);
+    renderWorkspace();
+    refreshZoneStatus();
+  });
+}
+
+function applyImageTransform(){
+  const id = state.selectedZone;
+  const design = state.designs[id];
+  const bbox = state.zoneBBox[id];
+  const grp = document.getElementById('ws-img-group');
+  if(!grp || !design) return;
+  const cx = bbox.x + bbox.w/2, cy = bbox.y + bbox.h/2;
+  const s = design.baseScale * design.scaleMult;
+  grp.setAttribute('transform',
+    `translate(${design.panX},${design.panY}) translate(${cx},${cy}) rotate(${design.rot}) scale(${s}) translate(${-design.natW/2},${-design.natH/2})`);
+  updateOverviewZone(id);
+}
+
+function attachDrag(svg, wrap, id){
+  let dragging = false;
+  let startSVG = {x:0,y:0};
+  let startPan = {x:0,y:0};
+
+  function toSVG(clientX, clientY){
+    const pt = svg.createSVGPoint();
+    pt.x = clientX; pt.y = clientY;
+    const ctm = svg.getScreenCTM();
+    if(!ctm) return {x:0,y:0};
+    const inv = ctm.inverse();
+    const p = pt.matrixTransform(inv);
+    return {x:p.x, y:p.y};
+  }
+
+  svg.addEventListener('pointerdown', e=>{
+    dragging = true;
+    wrap.classList.add('dragging');
+    startSVG = toSVG(e.clientX, e.clientY);
+    const d = state.designs[id];
+    startPan = {x:d.panX, y:d.panY};
+    svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    const cur = toSVG(e.clientX, e.clientY);
+    const d = state.designs[id];
+    d.panX = startPan.x + (cur.x - startSVG.x);
+    d.panY = startPan.y + (cur.y - startSVG.y);
+    applyImageTransform();
+  });
+  function end(e){
+    dragging = false;
+    wrap.classList.remove('dragging');
+  }
+  svg.addEventListener('pointerup', end);
+  svg.addEventListener('pointercancel', end);
+}
+
+function downscale(dataURL, maxDim, quality){
+  return new Promise((resolve)=>{
+    const im = new Image();
+    im.onload = ()=>{
+      let w = im.naturalWidth, h = im.naturalHeight;
+      if(w > maxDim || h > maxDim){
+        const ratio = Math.min(maxDim/w, maxDim/h);
+        w = Math.round(w*ratio); h = Math.round(h*ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(im, 0, 0, w, h);
+      resolve({url: canvas.toDataURL('image/jpeg', quality), w, h});
+    };
+    im.onerror = ()=> resolve({url: dataURL, w: 800, h: 800});
+    im.src = dataURL;
+  });
+}
+
+async function applyFinalImageToZone(zoneId, rawDataUrl){
+  const working = await downscale(rawDataUrl, 1400, 0.87);
+  const bbox = state.zoneBBox[zoneId];
+  const baseScale = Math.max(bbox.w/working.w, bbox.h/working.h);
+  state.designs[zoneId] = {
+    img: working.url,
+    natW: working.w,
+    natH: working.h,
+    baseScale,
+    panX: 0, panY: 0, rot: 0, scaleMult: 1,
+  };
+  if(state.selectedZone === zoneId){ renderWorkspace(); }
+  refreshZoneStatus();
+}
+
+// The union of every panel's bbox, in the shared bike coordinate space the
+// panel geometry already lives in.
+function kitBBox(){
+  let x0=Infinity, y0=Infinity, x1=-Infinity, y1=-Infinity;
+  ZONES.forEach(z=>{
+    const b = state.zoneBBox[z.id];
+    if(!b) return;
+    x0=Math.min(x0,b.x); y0=Math.min(y0,b.y);
+    x1=Math.max(x1,b.x+b.w); y1=Math.max(y1,b.y+b.h);
+  });
+  return {x:x0, y:y0, w:x1-x0, h:y1-y0};
+}
+
+// Lay one image over the whole kit at once. Every panel gets the same picture
+// placed at the same spot in bike coordinates, so the design carries across the
+// cut lines instead of being repeated six times. Panels stay individually
+// adjustable afterwards.
+async function applyKitwideImage(rawDataUrl){
+  const working = await downscale(rawDataUrl, 1800, 0.87);
+  const u = kitBBox();
+  const baseScale = Math.max(u.w/working.w, u.h/working.h);
+  const ux = u.x + u.w/2, uy = u.y + u.h/2;
+  ZONES.forEach(z=>{
+    const b = state.zoneBBox[z.id];
+    if(!b) return;
+    const cx = b.x + b.w/2, cy = b.y + b.h/2;
+    state.designs[z.id] = {
+      img: working.url,
+      natW: working.w,
+      natH: working.h,
+      baseScale,
+      // Offset each panel so the shared image sits over the kit as a whole
+      // rather than being centred on that panel.
+      panX: ux - cx,
+      panY: uy - cy,
+      rot: 0, scaleMult: 1,
+    };
+    updateOverviewZone(z.id);
+  });
+  if(state.selectedZone) renderWorkspace();
+  refreshZoneStatus();
+  const msg = document.getElementById('kitwide-msg');
+  msg.style.display = 'block';
+  msg.textContent = 'Laid across all ' + ZONES.length + ' panels. Tap any panel to nudge or rescale it on its own.';
+  document.getElementById('kitwide-clear').style.display = '';
+}
+
+// Ready-made kit designs. Same path as an upload: the image is laid across
+// every panel at once, then any panel can be nudged on its own.
+const PRESETS = [
+  {id:"race",     label:"Race",     file:"kits/race.jpg"},
+  {id:"rally",    label:"Rally",    file:"kits/rally.jpg"},
+  {id:"retro",    label:"Retro",    file:"kits/retro.jpg"},
+  {id:"splatter", label:"Splatter", file:"kits/splatter.jpg"},
+];
+
+function buildPresetRow(){
+  const row = document.getElementById('preset-row');
+  row.innerHTML = '';
+  PRESETS.forEach(p=>{
+    const btn = document.createElement('button');
+    btn.className = 'preset';
+    btn.id = 'preset-' + p.id;
+    btn.type = 'button';
+    btn.innerHTML = `<img src="${p.file.replace('.jpg','-thumb.jpg')}" alt="" loading="lazy"><span>${p.label}</span>`;
+    btn.addEventListener('click', ()=> applyPreset(p));
+    row.appendChild(btn);
+  });
+}
+
+async function applyPreset(p){
+  const msg = document.getElementById('kitwide-msg');
+  msg.style.display = 'block';
+  msg.textContent = 'Loading the ' + p.label + ' design\u2026';
+  try{
+    // Same origin, so the canvas in downscale() is not tainted.
+    const res = await fetch(p.file);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob();
+    const dataUrl = await new Promise((resolve, reject)=>{
+      const r = new FileReader();
+      r.onload = ()=> resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+    await applyKitwideImage(dataUrl);
+    document.querySelectorAll('.preset').forEach(el=> el.classList.remove('sel'));
+    document.getElementById('preset-' + p.id).classList.add('sel');
+  }catch(err){
+    msg.textContent = 'Could not load that design. Try again, or upload your own artwork.';
+  }
+}
+
+function clearAllPanels(){
+  ZONES.forEach(z=>{ delete state.designs[z.id]; updateOverviewZone(z.id); });
+  if(state.selectedZone) renderWorkspace();
+  refreshZoneStatus();
+  document.getElementById('kitwide-msg').style.display = 'none';
+  document.getElementById('kitwide-clear').style.display = 'none';
+  document.querySelectorAll('.preset').forEach(el=> el.classList.remove('sel'));
+}
+
+async function handleUpload(zoneId, file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e)=>{
+    await applyFinalImageToZone(zoneId, e.target.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+async function handleStageFiles(zoneId, fileList){
+  if(!state.staged[zoneId]) state.staged[zoneId] = [];
+  const room = Math.max(0, 6 - state.staged[zoneId].length);
+  const files = Array.from(fileList).slice(0, room);
+  for(const file of files){
+    const dataUrl = await new Promise((resolve)=>{
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+    state.staged[zoneId].push(dataUrl);
+  }
+  renderWorkspace();
+}
+
+function loadImageEl(src){
+  return new Promise((resolve)=>{
+    const im = new Image();
+    im.onload = ()=>resolve(im);
+    im.onerror = ()=>resolve(null);
+    im.src = src;
+  });
+}
+
+// Placeholder combine, a plain grid blend, not real AI curation. Wiring true
+// generative curation in needs a server-side call (cost + abuse concerns,
+// same shape as the Stripe decision) rather than something to fake here.
+async function buildGridBlend(dataUrls){
+  const imgs = (await Promise.all(dataUrls.slice(0,4).map(loadImageEl))).filter(Boolean);
+  if(imgs.length === 0) return dataUrls[0];
+  if(imgs.length === 1) return dataUrls[0];
+  const size = 900;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cols = imgs.length <= 2 ? imgs.length : 2;
+  const rows = Math.ceil(imgs.length/cols);
+  const cellW = size/cols, cellH = size/rows;
+  imgs.forEach((im,i)=>{
+    const cx = (i%cols)*cellW, cy = Math.floor(i/cols)*cellH;
+    const scale = Math.max(cellW/im.width, cellH/im.height);
+    const dw = im.width*scale, dh = im.height*scale;
+    const dx = cx + (cellW-dw)/2, dy = cy + (cellH-dh)/2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(cx,cy,cellW,cellH);
+    ctx.clip();
+    ctx.drawImage(im, dx, dy, dw, dh);
+    ctx.restore();
+  });
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+async function finalizeStagedZone(zoneId){
+  const staged = state.staged[zoneId] || [];
+  if(staged.length === 0) return;
+  const finalDataUrl = staged.length === 1 ? staged[0] : await buildGridBlend(staged);
+  await applyFinalImageToZone(zoneId, finalDataUrl);
+  delete state.staged[zoneId];
+}
+
+function renderStagingUI(zoneId, body){
+  const staged = state.staged[zoneId] || [];
+  const wrap = document.createElement('div');
+  wrap.className = 'ws-empty';
+
+  if(staged.length === 0){
+    wrap.innerHTML = 'No design on this panel yet. Upload one image, or several to blend into one.<br><br>';
+  } else {
+    const thumbRow = document.createElement('div');
+    thumbRow.className = 'stage-thumbs';
+    staged.forEach((src, i) => {
+      const thumbWrap = document.createElement('div');
+      thumbWrap.className = 'stage-thumb';
+      const im = document.createElement('img');
+      im.src = src;
+      const rm = document.createElement('button');
+      rm.className = 'stage-thumb-remove';
+      rm.textContent = '\u00d7';
+      rm.addEventListener('click', ()=>{
+        state.staged[zoneId].splice(i,1);
+        renderWorkspace();
+      });
+      thumbWrap.appendChild(im);
+      thumbWrap.appendChild(rm);
+      thumbRow.appendChild(thumbWrap);
+    });
+    wrap.appendChild(thumbRow);
+  }
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'upload-btn';
+  addBtn.textContent = staged.length ? 'Add another image' : 'Upload image(s)';
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true; inp.style.display = 'none';
+  inp.addEventListener('change', e => handleStageFiles(zoneId, e.target.files));
+  addBtn.addEventListener('click', () => inp.click());
+  wrap.appendChild(addBtn);
+  wrap.appendChild(inp);
+
+  if(staged.length >= 1){
+    const genBtn = document.createElement('button');
+    genBtn.className = 'btn-sm';
+    genBtn.style.marginTop = '10px';
+    genBtn.style.display = 'block';
+    genBtn.textContent = staged.length === 1 ? 'Use this image' : `Blend ${staged.length} images into one design`;
+    genBtn.addEventListener('click', ()=>finalizeStagedZone(zoneId));
+    wrap.appendChild(genBtn);
+    if(staged.length > 1){
+      const note = document.createElement('p');
+      note.className = 'hint';
+      note.style.marginTop = '8px';
+      note.style.color = 'var(--accent-2)';
+      note.textContent = 'Basic grid blend for now, not true AI curation. Real AI-curated mashups need a connected generation model, ask about wiring that up properly.';
+      wrap.appendChild(note);
+    }
+  }
+
+  body.appendChild(wrap);
+}
+
+function currentFulfilment(){
+  const checked = document.querySelector('input[name="fulfil"]:checked');
+  return checked ? checked.value : 'digital';
+}
+
+function refreshOrderState(){
+  const count = Object.keys(state.designs).length;
+  const btn = document.getElementById('submit-btn');
+  const summary = document.getElementById('summary-lines');
+  if(!btn || !summary) return; // order form isn't on screen (e.g. after checkout)
+  summary.innerHTML = '';
+  ZONES.forEach(z=>{
+    if(state.designs[z.id]){
+      const row = document.createElement('div');
+      row.className = 'summary-line';
+      row.innerHTML = `<span>${z.label}</span><span>Design placed</span>`;
+      summary.appendChild(row);
+    }
+  });
+  if(count === 0){
+    btn.disabled = true;
+    btn.textContent = 'Place a panel design first';
+  } else {
+    btn.disabled = false;
+    btn.textContent = `Continue to payment \u2014 ${count} panel${count>1?'s':''}`;
+  }
+}
+
+// Builds a real, standalone SVG of the kit as currently designed, using the
+// same nodes driving the live preview, so the file always matches what was shown.
+function buildExportSVG(orderId){
+  const src = document.getElementById('overview-svg');
+  const clone = src.cloneNode(true);
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+  // real-world size, taken from the source template's own measurement note
+  clone.setAttribute('width', '237.688cm');
+  clone.setAttribute('height', '145.918cm');
+  const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  bg.setAttribute('x', VB_X); bg.setAttribute('y', VB_Y);
+  bg.setAttribute('width', VB_W); bg.setAttribute('height', VB_H);
+  bg.setAttribute('fill', '#ffffff');
+  clone.insertBefore(bg, clone.firstChild);
+
+  // The live page's colours come from an external stylesheet, which a
+  // downloaded standalone file doesn't carry with it. Bake the same
+  // colours in as inline attributes so the file looks right on its own —
+  // most importantly, the outline layer must be explicitly fill:none or
+  // it defaults to a solid black fill that blacks out the artwork underneath.
+  clone.querySelectorAll('.zone-shape').forEach(p=>{
+    p.setAttribute('fill', '#3a3d44');
+    p.setAttribute('stroke', '#54585f');
+    p.setAttribute('stroke-width', '260');
+  });
+  clone.querySelectorAll('.zone-edge').forEach(p=>{
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', '#8a8f97');
+    p.setAttribute('stroke-width', '220');
+  });
+
+  const title = document.createElementNS('http://www.w3.org/2000/svg','title');
+  title.textContent = 'CRF250L kit \u2014 order ' + orderId;
+  clone.insertBefore(title, clone.firstChild);
+  return new XMLSerializer().serializeToString(clone);
+}
+
+function triggerDownload(filename, content, mime){
+  const blob = new Blob([content], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+
+async function submitOrder(){
+  const errEl = document.getElementById('err-msg');
+  errEl.style.display = 'none';
+  const name = document.getElementById('f-name').value.trim();
+  const email = document.getElementById('f-email').value.trim();
+  const notes = document.getElementById('f-notes').value.trim();
+  const fulfilment = currentFulfilment();
+
+  if(!name || !email){
+    errEl.textContent = 'Add your name and email so we know where to send the kit.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting\u2026';
+
+  try{
+    const zonesOut = {};
+    for(const [zoneId, d] of Object.entries(state.designs)){
+      const thumb = await downscale(d.img, 480, 0.6);
+      zonesOut[zoneId] = {
+        label: zoneLabel(zoneId),
+        thumb: thumb.url,
+        placement: {panX: d.panX, panY: d.panY, rot: d.rot, scaleMult: d.scaleMult},
+      };
+    }
+    const orderId = 'CRF-' + Date.now().toString(36).toUpperCase();
+    // Order ids are timestamp-derived and therefore guessable. This token is the
+    // customer's actual claim on their file.
+    const downloadToken = crypto.randomUUID();
+    const record = {
+      id: orderId,
+      downloadToken,
+      model: 'Honda CRF250L (2007-2020)',
+      fulfilment,
+      name, email, notes,
+      submittedAt: new Date().toISOString(),
+      zones: zonesOut,
+    };
+    await saveOrder(record);
+    // Build the deliverable now and hand it to the server, so release can be
+    // gated on payment instead of happening in the browser.
+    await storeOrderFile(orderId, buildExportSVG(orderId));
+
+    document.getElementById('confirm-area').innerHTML = '';
+    const confirm = document.createElement('div');
+    confirm.className = 'confirm';
+
+    const stripeUrl = stripeLinkFor(fulfilment, orderId);
+    const payWrap = document.createElement('div');
+    payWrap.style.marginTop = '16px';
+    if(stripeUrl){
+      const payLink = document.createElement('a');
+      payLink.href = stripeUrl;
+      payLink.target = '_blank';
+      payLink.rel = 'noopener';
+      payLink.className = 'upload-btn';
+      payLink.style.textDecoration = 'none';
+      payLink.style.display = 'inline-block';
+      payLink.textContent = 'Pay with Stripe';
+      payWrap.appendChild(payLink);
+    } else {
+      const missing = document.createElement('p');
+      missing.className = 'hint';
+      missing.style.color = 'var(--accent-2)';
+      missing.textContent = 'Payment is temporarily unavailable for this order type. Your order reference is saved \u2014 get in touch and we will sort it out.';
+      payWrap.appendChild(missing);
+    }
+
+    if(fulfilment === 'digital'){
+      confirm.innerHTML = `
+        <div class="eyebrow" style="justify-content:center;">Order received</div>
+        <div class="id">${orderId}</div>
+        <p>Pay with the link below &mdash; it carries this order reference through to Stripe. Once your payment clears, come back here and press <b>Check payment &amp; download</b>. Your file is held on our server and released only after Stripe confirms the payment.</p>
+      `;
+      confirm.appendChild(payWrap);
+
+      const manualWrap = document.createElement('div');
+      confirm.appendChild(manualWrap);
+
+      const checkBtn = document.createElement('button');
+      checkBtn.className = 'btn-sm';
+      checkBtn.style.marginTop = '14px';
+      checkBtn.style.maxWidth = '300px';
+      checkBtn.style.marginLeft = 'auto';
+      checkBtn.style.marginRight = 'auto';
+      checkBtn.style.display = 'block';
+      checkBtn.textContent = 'Check payment & download';
+      manualWrap.appendChild(checkBtn);
+
+      const status = document.createElement('p');
+      status.className = 'hint';
+      status.style.textAlign = 'center';
+      status.style.marginTop = '8px';
+      manualWrap.appendChild(status);
+
+      checkBtn.addEventListener('click', async ()=>{
+        checkBtn.disabled = true;
+        status.style.color = '';
+        status.textContent = 'Checking with Stripe\u2026';
+        try{
+          const out = await fetchPaidFile(orderId, downloadToken);
+          if(!out.paid){
+            status.style.color = 'var(--accent-2)';
+            status.textContent = "Stripe hasn't confirmed this payment yet. If you've just paid, give it a few seconds and try again.";
+            checkBtn.disabled = false;
+            return;
+          }
+          triggerDownload('crf250l-kit-'+orderId+'.svg', out.svg, 'image/svg+xml');
+          status.style.color = 'var(--success)';
+          status.textContent = 'Payment confirmed \u2014 your kit file has downloaded.';
+          checkBtn.textContent = 'Download again';
+          checkBtn.disabled = false;
+        }catch(err){
+          status.style.color = 'var(--accent-2)';
+          status.textContent = 'Could not check payment right now. Try again in a moment.';
+          checkBtn.disabled = false;
+        }
+      });
+    }
+    document.getElementById('order-card').innerHTML = '';
+    document.getElementById('order-card').appendChild(confirm);
+  }catch(err){
+    errEl.textContent = 'Could not submit the order right now. Try again in a moment.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    refreshOrderState();
+  }
+}
+
+document.getElementById('submit-btn').addEventListener('click', submitOrder);
+
+buildOverview();
+buildBikePreview();
+buildPresetRow();
+document.getElementById('kitwide-btn').addEventListener('click', ()=>{
+  const inp = document.createElement('input');
+  inp.type='file'; inp.accept='image/*';
+  inp.addEventListener('change', ()=>{
+    const file = inp.files && inp.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      document.querySelectorAll('.preset').forEach(el=> el.classList.remove('sel'));
+      applyKitwideImage(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  });
+  inp.click();
+});
+document.getElementById('kitwide-clear').addEventListener('click', clearAllPanels);
+
+buildZoneList();
+refreshZoneStatus();
+</script>
+</body>
+</html>
