@@ -48,7 +48,12 @@ h1{font-family:'Oswald',sans-serif;font-size:34px;font-weight:600;letter-spacing
 @media(max-width:520px){.views{grid-template-columns:1fr;}}
 .view{position:relative;}
 .view-label{font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;}
-svg.garment-svg{width:100%;height:auto;display:block;background:#0d0e11;border-radius:8px;}
+/* A studio backdrop rather than near-black. The garment defaults to a dark
+   colour, and on a #0d0e11 panel that left only the red outline visible — the
+   preview read as a technical drawing instead of a jersey. */
+svg.garment-svg{width:100%;height:auto;display:block;border-radius:8px;
+  background:radial-gradient(120% 90% at 50% 18%, #2b3038 0%, #191c22 55%, #101216 100%);}
+svg.garment-svg .panel-hit{cursor:pointer;}
 
 /* zones */
 .zone-list{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
@@ -94,6 +99,17 @@ table.roster input,table.roster select{padding:6px 8px;font-size:13px;}
 .tier-note{font-size:12px;color:var(--accent-2);margin-top:6px;}
 .tiers{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
 .tier{font-size:11px;font-family:'Oswald',sans-serif;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:4px 9px;color:var(--text-dim);}
+
+/* Colour swatches. A hex field is a developer's idea of picking a colour:
+   you cannot see what you are choosing until you have already typed it. */
+.swatches{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px;}
+.swatch{width:30px;height:30px;border-radius:8px;border:2px solid var(--line);cursor:pointer;padding:0;
+  position:relative;transition:transform .12s,border-color .12s;}
+.swatch:hover{transform:translateY(-2px);}
+.swatch[aria-pressed="true"]{border-color:var(--accent-2);box-shadow:0 0 0 2px rgba(255,138,30,.28);}
+.swatch:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px;}
+input[type=color]{width:44px;height:30px;padding:2px;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:8px;cursor:pointer;}
 
 /* Artwork placement controls */
 .garment-svg{touch-action:none;}
@@ -168,13 +184,16 @@ footer{margin-top:38px;font-size:12px;color:var(--text-dim);text-align:center;}
 
       <div class="field-row">
         <div class="field">
-          <label for="base-col">Garment colour</label>
-          <input type="text" id="base-col" value="#1b1d22" list="cols">
-          <datalist id="cols"><option value="#1b1d22"><option value="#e2231a"><option value="#f2f3f5"><option value="#1e4fd8"><option value="#128a3f"></datalist>
+          <label>Garment colour</label>
+          <div class="swatches" id="base-swatches">
+            <input type="color" id="base-col" value="#2f3742" aria-label="Custom garment colour">
+          </div>
         </div>
         <div class="field">
-          <label for="trim-col">Trim colour</label>
-          <input type="text" id="trim-col" value="#e2231a" list="cols">
+          <label>Trim colour</label>
+          <div class="swatches" id="trim-swatches">
+            <input type="color" id="trim-col" value="#e2231a" aria-label="Custom trim colour">
+          </div>
         </div>
       </div>
     </div>
@@ -369,8 +388,26 @@ function renderPreview(){
   for(const view of ["front","back"]){
     const svg = $("svg-" + view);
     const parts = [];
-    parts.push(`<defs><clipPath id="body-${view}"><path d="${shape.body}"/></clipPath></defs>`);
-    parts.push(`<path d="${shape.body}" fill="${escapeAttr(base)}" stroke="${escapeAttr(trim)}" stroke-width="3"/>`);
+    // Fabric shading and a contact shadow. A flat fill on a flat background is
+    // what made this read as a wireframe: the eye needs the garment to sit in
+    // front of something and to have a lit side.
+    parts.push(
+      `<defs>`
+      + `<clipPath id="body-${view}"><path d="${shape.body}"/></clipPath>`
+      + `<linearGradient id="fab-${view}" x1="0" y1="0" x2="0.35" y2="1">`
+      +   `<stop offset="0%" stop-color="#fff" stop-opacity=".16"/>`
+      +   `<stop offset="45%" stop-color="#fff" stop-opacity=".03"/>`
+      +   `<stop offset="100%" stop-color="#000" stop-opacity=".28"/>`
+      + `</linearGradient>`
+      + `<radialGradient id="shadow-${view}" cx="0.5" cy="0.5" r="0.5">`
+      +   `<stop offset="0%" stop-color="#000" stop-opacity=".55"/>`
+      +   `<stop offset="100%" stop-color="#000" stop-opacity="0"/>`
+      + `</radialGradient>`
+      + `</defs>`
+    );
+    parts.push(`<ellipse cx="150" cy="342" rx="96" ry="13" fill="url(#shadow-${view})"/>`);
+    parts.push(`<path d="${shape.body}" fill="${escapeAttr(base)}" stroke="${escapeAttr(trim)}" stroke-width="2" stroke-linejoin="round"/>`);
+    parts.push(`<path d="${shape.body}" fill="url(#fab-${view})" pointer-events="none"/>`);
 
     for(const z of zonesFor()){
       if(z.view !== view) continue;
@@ -393,13 +430,32 @@ function renderPreview(){
           parts.push(`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="none" stroke="${escapeAttr(trim)}" stroke-width="1.5" stroke-dasharray="5 4" opacity=".55" pointer-events="none"/>`);
         }
       } else {
-        parts.push(`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="none" stroke="${escapeAttr(trim)}" stroke-width="1.5" stroke-dasharray="5 4" opacity=".7"/>`);
-        // A long label in a narrow zone spills outside the garment, so drop it
-        // below the box rather than centring it inside.
-        const narrow = r.w < z.label.length * 7;
-        const ly = narrow ? r.y + r.h + 12 : r.y + r.h/2 + 4;
-        parts.push(`<text x="${r.x + r.w/2}" y="${ly}" text-anchor="middle" font-family="Oswald,sans-serif" font-size="${narrow ? 9 : 11}" fill="${escapeAttr(trim)}" opacity=".85">${escapeHTML(z.label.toUpperCase())}</text>`);
+        // An empty panel is an invitation, so it says what it is and what it
+        // costs you nothing to try. The selected one is filled and solid; the
+        // rest stay quiet so the garment does not turn into a grid of boxes.
+        const on = z.id === state.zone;
+        parts.push(
+          `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="3"`
+          + ` fill="${on ? escapeAttr(trim) : "#ffffff"}" fill-opacity="${on ? ".14" : ".05"}"`
+          + ` stroke="${escapeAttr(trim)}" stroke-width="${on ? 2 : 1.2}"`
+          + ` stroke-dasharray="${on ? "none" : "5 4"}" opacity="${on ? "1" : ".6"}"/>`
+        );
+        // Only the selected panel is labelled. Labelling every panel was what
+        // pushed "SLEEVES" off the side of the garment, and three captions on
+        // a small jersey is noise rather than help.
+        if(on){
+          const narrow = r.w < z.label.length * 7;
+          const ly = narrow ? r.y + r.h + 11 : r.y + r.h/2 + 4;
+          parts.push(`<text x="${Math.min(Math.max(r.x + r.w/2, 40), 260)}" y="${ly}" text-anchor="middle" font-family="Oswald,sans-serif" font-size="${narrow ? 9 : 10}" letter-spacing="1" fill="${escapeAttr(trim)}">${escapeHTML(z.label.toUpperCase())}</text>`);
+        }
       }
+      // Clicking the panel on the garment selects it. Hunting for the matching
+      // row in a list underneath is the least direct way to say "this bit".
+      parts.push(
+        `<rect class="panel-hit" data-zone="${escapeAttr(z.id)}"`
+        + ` x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="transparent">`
+        + `<title>${escapeHTML(z.label)} — ${z.cm[0]}×${z.cm[1]}cm</title></rect>`
+      );
     }
 
     // Rider name/number preview on the back of tops, using the first roster row.
@@ -410,6 +466,47 @@ function renderPreview(){
     }
     svg.innerHTML = parts.join("");
   }
+}
+
+// Colours a race jersey is actually printed in, rather than five arbitrary hex
+// codes. The colour input beside them stays for anything not on the list.
+const GARMENT_COLS = ["#2f3742","#101216","#f2f3f5","#e2231a","#1e4fd8","#128a3f"];
+const TRIM_COLS    = ["#e2231a","#ff8a1e","#f2f3f5","#101216","#1e4fd8","#f5c518"];
+
+function renderSwatches(){
+  for(const [boxId, cols, inputId] of [
+    ["base-swatches", GARMENT_COLS, "base-col"],
+    ["trim-swatches", TRIM_COLS, "trim-col"],
+  ]){
+    const box = $(boxId), input = $(inputId);
+    // The colour input lives in this row too, so clear only the swatches and
+    // insert before it — rebuilding the whole row would delete the input.
+    box.querySelectorAll(".swatch").forEach(el => el.remove());
+    for(const c of cols){
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "swatch";
+      b.style.background = c;
+      b.title = c;
+      b.setAttribute("aria-label", "Colour " + c);
+      b.setAttribute("aria-pressed", input.value.toLowerCase() === c ? "true" : "false");
+      b.addEventListener("click", ()=>{ input.value = c; renderSwatches(); renderPreview(); });
+      box.insertBefore(b, input);
+    }
+  }
+}
+
+// One place that changes the selected panel, because two now do it: the list
+// underneath and the panel itself on the garment.
+function selectZoneById(id){
+  const z = zonesFor().find(x => x.id === id);
+  if(!z) return;
+  state.zone = id;
+  $("zone-target").textContent = z.label;
+  renderZones();
+  renderArtControls();
+  updateArtHint(id);
+  renderPreview();
 }
 
 function renderArtControls(){
@@ -484,7 +581,21 @@ function attachDrag(view){
     return state.art[z.id] || null;
   }
 
+  // Clicking a panel on the garment selects it.
+  svg.addEventListener("click", (e)=>{
+    const hit = e.target.closest && e.target.closest(".panel-hit");
+    if(!hit) return;
+    const id = hit.getAttribute("data-zone");
+    if(!id || id === state.zone) return;
+    selectZoneById(id);
+  });
+
   svg.addEventListener("pointerdown", (e)=>{
+    // A press on some other panel is a selection, not a drag: starting one
+    // would shove the artwork you already placed while you were trying to
+    // point at a different part of the garment.
+    const hit = e.target.closest && e.target.closest(".panel-hit");
+    if(hit && hit.getAttribute("data-zone") !== state.zone) return;
     const a = active();
     if(!a) return;
     const p = toSVG(e);
@@ -521,16 +632,7 @@ function renderZones(){
     row.setAttribute("role", "button");
     row.tabIndex = 0;
     row.setAttribute("aria-pressed", z.id === state.zone ? "true" : "false");
-    const selectZone = () => {
-      state.zone = z.id;
-      renderZones();
-      $("zone-target").textContent = z.label;
-      // The controls belong to whichever panel is selected, and the preview
-      // outlines it, so both follow the selection.
-      renderArtControls();
-      updateArtHint(z.id);
-      renderPreview();
-    };
+    const selectZone = () => selectZoneById(z.id);
     row.addEventListener("click", selectZone);
     row.addEventListener("keydown", (e)=>{
       if(e.key === "Enter" || e.key === " "){ e.preventDefault(); selectZone(); }
@@ -886,12 +988,17 @@ $("submit").addEventListener("click", async ()=>{
 function escapeHTML(s){ return String(s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
 function escapeAttr(s){ return escapeHTML(s); }
 
-function renderAll(){ renderGarments(); renderZones(); renderArtControls(); renderRoster(); renderPrice(); renderPreview(); refreshSubmit(); }
+function renderAll(){ renderGarments(); renderSwatches(); renderZones(); renderArtControls(); renderRoster(); renderPrice(); renderPreview(); refreshSubmit(); }
 
 attachDrag("front");
 attachDrag("back");
 
-["base-col","trim-col"].forEach(id => $(id).addEventListener("input", renderPreview));
+// Typing a custom colour has to clear whichever swatch was showing as chosen,
+// or two colours claim to be selected at once.
+["base-col","trim-col"].forEach(id => $(id).addEventListener("input", ()=>{
+  renderSwatches();
+  renderPreview();
+}));
 ["f-name","f-email","f-club"].forEach(id => $(id).addEventListener("input", refreshSubmit));
 $("add-rider").addEventListener("click", addRider);
 
