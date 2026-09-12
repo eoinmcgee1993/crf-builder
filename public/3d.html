@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRF250L · 3D decal preview</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+:root{
+  --bg:#121316; --panel:#1b1d22; --panel-2:#22252b; --line:#2d3037;
+  --text:#eef0f2; --text-dim:#9aa0aa; --accent:#e2231a; --accent-2:#ff8a1e;
+  --success:#3ddc84; --radius:10px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;}
+::selection{background:var(--accent);color:#fff;}
+.wrap{max-width:1280px;margin:0 auto;padding:24px 20px 60px;}
+.eyebrow{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-2);font-weight:600;display:flex;align-items:center;gap:8px;}
+.eyebrow::before{content:"";width:18px;height:2px;background:var(--accent);display:inline-block;}
+h1{font-family:'Oswald',sans-serif;font-weight:700;font-size:clamp(26px,3.5vw,38px);letter-spacing:-0.01em;margin:6px 0 4px;}
+.sub{color:var(--text-dim);font-size:14px;max-width:720px;line-height:1.5;}
+.grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;align-items:start;margin-top:20px;}
+@media (max-width:900px){.grid{grid-template-columns:1fr;}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;}
+.card h2{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.06em;text-transform:uppercase;margin:0 0 4px;font-weight:600;}
+.card .hint{color:var(--text-dim);font-size:12.5px;margin:0 0 14px;line-height:1.5;}
+.viewport-wrap{position:relative;background:radial-gradient(ellipse at 50% 70%,#1c1e23 0%,#0d0e11 100%);border:1px solid var(--line);border-radius:8px;overflow:hidden;aspect-ratio:16/10;cursor:grab;}
+.viewport-wrap:active{cursor:grabbing;}
+.viewport-wrap canvas{display:block;width:100%;height:100%;}
+.viewport-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--text-dim);font-size:13px;gap:10px;background:rgba(18,19,22,0.7);z-index:5;padding:20px;text-align:center;}
+.viewport-loading .bar{width:60%;max-width:240px;height:3px;background:var(--line);border-radius:2px;overflow:hidden;}
+.viewport-loading .bar>div{height:100%;background:var(--accent);width:0%;transition:width .15s;}
+.viewport-hint{position:absolute;left:10px;bottom:8px;font-size:11px;color:var(--text-dim);background:rgba(0,0,0,0.45);padding:3px 8px;border-radius:4px;pointer-events:none;z-index:4;}
+.viewport-controls{position:absolute;right:10px;top:8px;display:flex;gap:6px;z-index:4;}
+.viewport-controls button{background:rgba(0,0,0,0.55);border:1px solid var(--line);color:var(--text);font-family:'Inter',sans-serif;font-size:11px;font-weight:500;padding:5px 9px;border-radius:4px;cursor:pointer;transition:border-color .15s;}
+.viewport-controls button:hover{border-color:var(--text-dim);}
+.viewport-controls button:focus-visible{outline:2px solid var(--accent-2);outline-offset:1px;}
+.panel-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;}
+.panel-tile{background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:10px 12px;display:flex;align-items:center;cursor:pointer;font-size:12.5px;transition:border-color .15s,background .15s;user-select:none;}
+.panel-tile:hover{border-color:#454951;}
+.panel-tile:focus-visible{outline:2px solid var(--accent-2);outline-offset:1px;}
+.panel-tile.active{border-color:var(--accent);background:rgba(226,35,26,0.08);}
+.panel-tile .dot{width:8px;height:8px;border-radius:50%;background:#54585f;flex-shrink:0;margin-right:8px;}
+.panel-tile.has-decal .dot{background:var(--success);}
+.panel-tile .name{flex:1;}
+.panel-tile .clear{background:transparent;border:none;color:var(--text-dim);font-size:14px;cursor:pointer;padding:0 4px;line-height:1;}
+.panel-tile .clear:hover{color:var(--accent);}
+.preset-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;}
+.preset{border:1px solid var(--line);border-radius:6px;overflow:hidden;cursor:pointer;background:var(--panel-2);padding:0;text-align:left;transition:border-color .15s;}
+.preset:hover{border-color:var(--text-dim);}
+.preset.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+.preset:focus-visible{outline:2px solid var(--accent-2);outline-offset:1px;}
+.preset-thumb{width:100%;height:42px;background-size:cover;background-position:center;background-color:#2a2d33;}
+.preset span{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);padding:4px 6px;}
+.preset.sel span{color:var(--text);}
+.btn{background:var(--accent);color:#fff;border:none;padding:11px 18px;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;display:inline-flex;align-items:center;gap:6px;}
+.btn:hover{background:#c91d15;}
+.btn:focus-within,.btn:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px;}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--text);padding:9px 12px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;transition:border-color .15s;}
+.btn-ghost:hover{border-color:var(--text-dim);}
+.btn-ghost:focus-within,.btn-ghost:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px;}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.section-title{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-2);font-weight:600;margin:14px 0 8px;}
+.upload-row{display:flex;gap:8px;align-items:center;background:var(--panel-2);border:1px dashed var(--line);border-radius:6px;padding:12px;margin-bottom:8px;}
+.upload-row .file-name{color:var(--text-dim);font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1d22;border:1px solid var(--line);color:var(--text);padding:10px 16px;border-radius:6px;font-size:13px;box-shadow:0 4px 20px rgba(0,0,0,0.4);opacity:0;pointer-events:none;transition:opacity .2s;z-index:99;}
+.toast.show{opacity:1;}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms !important;transition-duration:.001ms !important;}}
+footer{margin-top:30px;font-size:11px;color:var(--text-dim);text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Honda CRF250L &middot; 3D decal preview</div>
+    <h1>See your kit on the bike</h1>
+    <p class="sub">Drag to rotate, scroll to zoom. Pick a panel, drop a design on it, and the graphics wrap over the six cut lines the production kit uses.</p>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Live 3D preview</h2>
+      <p class="hint">The bike underneath is a placeholder model. Everything painted on the six panels is your own artwork.</p>
+      <div class="viewport-wrap" id="viewport">
+        <div class="viewport-loading" id="loading">
+          <div id="loading-text">Loading model&hellip;</div>
+          <div class="bar"><div id="bar"></div></div>
+        </div>
+        <div class="viewport-hint" id="vp-hint" hidden>drag &middot; scroll &middot; right-drag to pan</div>
+        <div class="viewport-controls">
+          <button id="btn-reset">Reset</button>
+          <button id="btn-side">Right</button>
+          <button id="btn-front">Front</button>
+          <button id="btn-rear">Rear</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Panels</h2>
+      <p class="hint">Each tile is a cut line from the kit. Click a panel to focus it, then drop a design.</p>
+      <div class="panel-grid" id="panel-grid" role="listbox" aria-label="Decal panels"></div>
+
+      <div class="section-title">One design across the whole kit</div>
+      <div class="preset-row" id="preset-row">
+        <button class="preset" data-preset="race"><div class="preset-thumb" id="thumb-race"></div><span>Race</span></button>
+        <button class="preset" data-preset="rally"><div class="preset-thumb" id="thumb-rally"></div><span>Rally</span></button>
+        <button class="preset" data-preset="retro"><div class="preset-thumb" id="thumb-retro"></div><span>Retro</span></button>
+        <button class="preset" data-preset="splatter"><div class="preset-thumb" id="thumb-splatter"></div><span>Splatter</span></button>
+      </div>
+      <div class="btn-row">
+        <label class="btn" for="kitwide-input">Upload your own artwork</label>
+        <input id="kitwide-input" type="file" accept="image/*" style="display:none;">
+        <button class="btn-ghost" id="btn-clear-all">Clear all panels</button>
+      </div>
+
+      <div class="section-title">Single panel</div>
+      <div class="upload-row">
+        <label class="btn-ghost" for="single-input">Choose image&hellip;</label>
+        <input id="single-input" type="file" accept="image/*" style="display:none;">
+        <span class="file-name" id="single-name">applies to the selected panel</span>
+      </div>
+    </div>
+  </div>
+
+  <footer>CRF Garage &middot; 3D decal preview</footer>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// Panel ids are the mesh names inside crf250l.glb, verified against the file.
+// They are NOT the storefront's zone ids — index.html uses 'front-fender',
+// 'rear-fender' and so on. Anything wiring the two together has to map
+// between them; 'rear-fender-tail' is a mesh name, not a zone.
+const PANELS = [
+  { id: 'panel_front_fender',     label: 'Front Fender' },
+  { id: 'panel_rear_fender_tail', label: 'Rear Fender / Tail' },
+  { id: 'panel_right_shroud',     label: 'Right Shroud' },
+  { id: 'panel_left_shroud',      label: 'Left Shroud' },
+  { id: 'panel_right_fork_guard', label: 'Right Fork Guard' },
+  { id: 'panel_left_fork_guard',  label: 'Left Fork Guard' },
+];
+
+const decals = Object.create(null);      // panelId -> THREE.Texture
+const panelMeshes = Object.create(null);
+let selectedPanel = PANELS[0].id;
+
+const DEFAULT_CAM = { pos: new THREE.Vector3(2.2, 1.15, 2.4), tgt: new THREE.Vector3(0, 0.55, 0) };
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- renderer ----------
+const viewport = document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+viewport.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(36, 1, 0.05, 50);
+camera.position.copy(DEFAULT_CAM.pos);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.copy(DEFAULT_CAM.tgt);
+// Damping needs update() every frame to settle. Reduced motion turns the
+// damping off rather than skipping update(), because skipping it stops the
+// drag from moving the camera at all.
+controls.enableDamping = !reducedMotion;
+controls.dampingFactor = 0.08;
+controls.minDistance = 1.4;
+controls.maxDistance = 6.0;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.update();
+
+const keyLight = new THREE.DirectionalLight(0xfff1d8, 1.25);
+keyLight.position.set(2.8, 3.2, 2.4);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+Object.assign(keyLight.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2 });
+keyLight.shadow.bias = -0.0005;
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0x8fa6d4, 0.55);
+fillLight.position.set(-2.8, 1.6, 1.2);
+scene.add(fillLight);
+
+const rimLight = new THREE.DirectionalLight(0xffffff, 0.6);
+rimLight.position.set(0.5, 1.4, -3.2);
+scene.add(rimLight);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+scene.add(new THREE.HemisphereLight(0xa3b8d0, 0x161616, 0.35));
+
+function resize() {
+  const r = viewport.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / r.height;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(viewport);
+resize();
+
+// ---------- textures ----------
+// One checker, made once and shared. The panels all fall back to the same
+// instance, so it must never be handed to disposeTexture.
+const checkerTex = (() => {
+  const size = 64;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#3a3d44'; ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = '#4f535b'; ctx.lineWidth = 1;
+  for (let i = 0; i <= size; i += 16) {
+    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(size, i); ctx.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+
+function imageToTexture(img) {
+  const tex = new THREE.Texture(img);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// A kit-wide preset puts ONE texture on all six panels. Disposing it because
+// one panel changed would blank the other five, and disposing it once per
+// panel would double-free it. Only the last reference releases.
+function releaseTexture(tex) {
+  if (!tex || tex === checkerTex) return;
+  if (PANELS.some(p => decals[p.id] === tex)) return;
+  tex.dispose();
+}
+
+function setPanelDecal(panelId, texture) {
+  const mesh = panelMeshes[panelId];
+  if (!mesh) return;
+  const old = decals[panelId];
+  decals[panelId] = texture;
+  mesh.material.map = texture;
+  mesh.material.color.set(0xffffff);
+  mesh.material.needsUpdate = true;
+  releaseTexture(old);
+  refreshDecalIndicators();
+}
+
+function applyDecalToAll(texture) {
+  const old = PANELS.map(p => decals[p.id]);
+  PANELS.forEach(p => {
+    const mesh = panelMeshes[p.id];
+    if (!mesh) return;
+    decals[p.id] = texture;
+    mesh.material.map = texture;
+    mesh.material.color.set(0xffffff);
+    mesh.material.needsUpdate = true;
+  });
+  old.forEach(releaseTexture);
+  refreshDecalIndicators();
+}
+
+function clearDecal(panelId) {
+  const mesh = panelMeshes[panelId];
+  if (!mesh) return;
+  const old = decals[panelId];
+  delete decals[panelId];
+  mesh.material.map = checkerTex;
+  mesh.material.color.set(0xffffff);
+  mesh.material.needsUpdate = true;
+  releaseTexture(old);
+  refreshDecalIndicators();
+}
+
+// ---------- model ----------
+new GLTFLoader().load('crf250l.glb', (gltf) => {
+  const model = gltf.scene;
+
+  model.traverse((obj) => {
+    if (!obj.isMesh) return;
+    obj.castShadow = true;
+    obj.receiveShadow = true;
+    // Every mesh in this file without its own material shares one default
+    // instance, so tuning roughness on the wheels would also tune it on the
+    // frame, the engine and the exhaust. Clone before touching anything.
+    obj.material = obj.material.clone();
+
+    if (PANELS.some(p => p.id === obj.name)) {
+      panelMeshes[obj.name] = obj;
+      obj.material.map = checkerTex;
+      obj.material.metalness = 0.05;
+      obj.material.roughness = 0.55;
+      obj.material.envMapIntensity = 0.6;
+      obj.material.side = THREE.DoubleSide;
+    } else if (obj.name === 'crf_contact_shadow') {
+      // Authored in the XY plane — it stands up as a 2.2m disc through the
+      // middle of the bike. Lay it on the ground where a shadow belongs.
+      obj.rotation.x = -Math.PI / 2;
+      obj.position.y = 0.002;
+      obj.castShadow = false;
+      obj.material.depthWrite = false;
+      obj.material.transparent = true;
+      obj.material.opacity = 0.55;
+    } else if (obj.name.startsWith('crf_wheel') || obj.name === 'crf_chain') {
+      obj.material.roughness = 0.95;
+      obj.material.envMapIntensity = 0.2;
+    } else if (obj.name === 'crf_exhaust' || obj.name === 'crf_radiator') {
+      obj.material.metalness = 0.85;
+      obj.material.roughness = 0.35;
+    }
+    obj.material.needsUpdate = true;
+  });
+
+  scene.add(model);
+  document.getElementById('loading').remove();
+  document.getElementById('vp-hint').hidden = false;
+  buildPanelGrid();
+  buildPresetRow();
+  highlightSelectedPanel();
+  renderer.setAnimationLoop(tick);
+  toast('Model loaded · ' + Object.keys(panelMeshes).length + ' decal panels ready');
+}, (xhr) => {
+  const pct = xhr.total ? Math.min(100, xhr.loaded / xhr.total * 100) : 0;
+  const bar = document.getElementById('bar');
+  const txt = document.getElementById('loading-text');
+  if (bar) bar.style.width = pct.toFixed(0) + '%';
+  if (txt) txt.textContent = 'Loading model… ' + pct.toFixed(0) + '%';
+}, (err) => {
+  const el = document.getElementById('loading');
+  if (el) {
+    el.style.color = '#ff8a8a';
+    el.textContent = 'Could not load crf250l.glb. It has to sit next to this page.';
+  }
+  console.error(err);
+});
+
+function tick() {
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ---------- panel list ----------
+function buildPanelGrid() {
+  const grid = document.getElementById('panel-grid');
+  const present = PANELS.filter(p => panelMeshes[p.id]);
+  grid.innerHTML = '';
+  present.forEach((p, idx) => {
+    const tile = document.createElement('div');
+    tile.className = 'panel-tile';
+    tile.tabIndex = 0;
+    tile.setAttribute('role', 'option');
+    tile.setAttribute('aria-selected', 'false');
+    tile.dataset.panel = p.id;
+    tile.dataset.idx = String(idx);
+
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.setAttribute('aria-hidden', 'true');
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = p.label;               // textContent, not innerHTML
+    const clear = document.createElement('button');
+    clear.className = 'clear';
+    clear.type = 'button';
+    clear.textContent = '×';
+    clear.title = 'Clear this panel';
+    clear.setAttribute('aria-label', 'Clear ' + p.label);
+    clear.addEventListener('click', (e) => { e.stopPropagation(); clearDecal(p.id); });
+
+    tile.append(dot, name, clear);
+    tile.addEventListener('click', () => selectPanel(p.id));
+    tile.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPanel(p.id); return; }
+      const step = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1
+                 : (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')  ? -1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      const next = grid.querySelector(`.panel-tile[data-idx="${(idx + step + present.length) % present.length}"]`);
+      if (next) next.focus();
+    });
+    grid.appendChild(tile);
+  });
+}
+
+function selectPanel(id) {
+  selectedPanel = id;
+  highlightSelectedPanel();
+  const mesh = panelMeshes[id];
+  if (!mesh) return;
+  // Move the orbit target onto the panel. lerp() here only travelled part of
+  // the way per click, so a panel took several clicks to centre.
+  const centre = new THREE.Vector3();
+  new THREE.Box3().setFromObject(mesh).getCenter(centre);
+  controls.target.copy(centre);
+  controls.update();
+}
+
+function highlightSelectedPanel() {
+  document.querySelectorAll('.panel-tile').forEach(el => {
+    const sel = el.dataset.panel === selectedPanel;
+    el.classList.toggle('active', sel);
+    el.setAttribute('aria-selected', sel ? 'true' : 'false');
+  });
+}
+
+function refreshDecalIndicators() {
+  document.querySelectorAll('.panel-tile').forEach(el => {
+    el.classList.toggle('has-decal', !!decals[el.dataset.panel]);
+  });
+}
+
+// ---------- presets ----------
+// Same-origin, same files the kit builder shows. They were pointed at a
+// different Vercel deployment, which is both a CORS canvas taint and the
+// wrong site.
+const PRESETS = ['race', 'rally', 'retro', 'splatter'];
+const presetUrl = k => 'kits/' + k + '.jpg';
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Failed to load ' + url));
+    img.src = url;
+  });
+}
+
+function buildPresetRow() {
+  PRESETS.forEach(key => {
+    const btn = document.querySelector(`.preset[data-preset="${key}"]`);
+    if (!btn) return;
+    const thumb = document.getElementById('thumb-' + key);
+    if (thumb) thumb.style.backgroundImage = `url("kits/${key}-thumb.jpg")`;
+    btn.addEventListener('click', async () => {
+      try {
+        const tex = imageToTexture(await loadImage(presetUrl(key)));
+        document.querySelectorAll('.preset').forEach(b => b.classList.toggle('sel', b === btn));
+        applyDecalToAll(tex);
+        toast('Applied ' + key + ' across all ' + Object.keys(panelMeshes).length + ' panels');
+      } catch (e) {
+        toast('Could not load the ' + key + ' design');
+      }
+    });
+  });
+}
+
+// ---------- uploads ----------
+function readImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that file'));
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('That file is not an image we can read'));
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+document.getElementById('single-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    setPanelDecal(selectedPanel, imageToTexture(await readImage(file)));
+    document.getElementById('single-name').textContent = file.name;
+    const label = PANELS.find(p => p.id === selectedPanel)?.label || selectedPanel;
+    toast('Applied "' + file.name + '" to ' + label);
+  } catch (err) { toast(err.message); }
+});
+
+document.getElementById('kitwide-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    applyDecalToAll(imageToTexture(await readImage(file)));
+    document.querySelectorAll('.preset').forEach(b => b.classList.remove('sel'));
+    toast('Laid "' + file.name + '" across all panels');
+  } catch (err) { toast(err.message); }
+});
+
+document.getElementById('btn-clear-all').addEventListener('click', () => {
+  PANELS.forEach(p => clearDecal(p.id));
+  document.querySelectorAll('.preset').forEach(b => b.classList.remove('sel'));
+  document.getElementById('single-name').textContent = 'applies to the selected panel';
+  toast('Cleared all panels');
+});
+
+// ---------- views ----------
+const VIEWS = {
+  'btn-reset': [DEFAULT_CAM.pos.toArray(), DEFAULT_CAM.tgt.toArray()],
+  'btn-side':  [[2.4, 1.05, 1.6], [0, 0.55, 0]],
+  'btn-front': [[0, 0.95, 3.4],   [0, 0.6, 0.4]],
+  'btn-rear':  [[0, 1.15, -3.2],  [0, 0.55, -0.4]],
+};
+for (const [id, [pos, tgt]] of Object.entries(VIEWS)) {
+  document.getElementById(id).addEventListener('click', () => {
+    camera.position.set(...pos);
+    controls.target.set(...tgt);
+    controls.update();
+  });
+}
+
+// ---------- toast ----------
+let toastTimer = null;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+renderer.domElement.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  toast('Graphics context lost — reloading…');
+  setTimeout(() => location.reload(), 1200);
+});
+</script>
+</body>
+</html>
