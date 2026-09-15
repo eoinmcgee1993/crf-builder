@@ -317,10 +317,8 @@ new GLTFLoader().load('crf250l.glb', (gltf) => {
       obj.material.envMapIntensity = 0.6;
       obj.material.side = THREE.DoubleSide;
     } else if (obj.name === 'crf_contact_shadow') {
-      // Authored in the XY plane — it stands up as a 2.2m disc through the
-      // middle of the bike. Lay it on the ground where a shadow belongs.
-      obj.rotation.x = -Math.PI / 2;
-      obj.position.y = 0.002;
+      // Laid flat by tools/repair_crf250l.py, so it only needs to stop
+      // casting a shadow of its own and stop fighting the panels for depth.
       obj.castShadow = false;
       obj.material.depthWrite = false;
       obj.material.transparent = true;
