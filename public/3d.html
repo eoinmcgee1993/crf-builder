@@ -80,7 +80,7 @@ footer{margin-top:30px;font-size:11px;color:var(--text-dim);text-align:center;}
   <div class="grid">
     <div class="card">
       <h2>Live 3D preview</h2>
-      <p class="hint">The bike underneath is a placeholder model. Everything painted on the six panels is your own artwork.</p>
+      <p class="hint">Everything painted on the six panels is your own artwork.</p>
       <div class="viewport-wrap" id="viewport">
         <div class="viewport-loading" id="loading">
           <div id="loading-text">Loading model&hellip;</div>
@@ -160,7 +160,7 @@ const decals = Object.create(null);      // panelId -> THREE.Texture
 const panelMeshes = Object.create(null);
 let selectedPanel = PANELS[0].id;
 
-const DEFAULT_CAM = { pos: new THREE.Vector3(2.2, 1.15, 2.4), tgt: new THREE.Vector3(0, 0.55, 0) };
+const DEFAULT_CAM = { pos: new THREE.Vector3(2.15, 1.00, 2.35), tgt: new THREE.Vector3(0, 0.62, -0.05) };
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------- renderer ----------
@@ -304,9 +304,8 @@ new GLTFLoader().load('crf250l.glb', (gltf) => {
     if (!obj.isMesh) return;
     obj.castShadow = true;
     obj.receiveShadow = true;
-    // Every mesh in this file without its own material shares one default
-    // instance, so tuning roughness on the wheels would also tune it on the
-    // frame, the engine and the exhaust. Clone before touching anything.
+    // Cloned so a tweak below lands on this mesh alone, never on whatever
+    // else the loader may have handed the same material to.
     obj.material = obj.material.clone();
 
     if (PANELS.some(p => p.id === obj.name)) {
@@ -317,19 +316,15 @@ new GLTFLoader().load('crf250l.glb', (gltf) => {
       obj.material.envMapIntensity = 0.6;
       obj.material.side = THREE.DoubleSide;
     } else if (obj.name === 'crf_contact_shadow') {
-      // Laid flat by tools/repair_crf250l.py, so it only needs to stop
-      // casting a shadow of its own and stop fighting the panels for depth.
+      // Built flat on the ground by tools/build_crf250l.py, so it only needs
+      // to stop casting a shadow of its own and fighting the panels for depth.
       obj.castShadow = false;
       obj.material.depthWrite = false;
       obj.material.transparent = true;
       obj.material.opacity = 0.55;
-    } else if (obj.name.startsWith('crf_wheel') || obj.name === 'crf_chain') {
-      obj.material.roughness = 0.95;
-      obj.material.envMapIntensity = 0.2;
-    } else if (obj.name === 'crf_exhaust' || obj.name === 'crf_radiator') {
-      obj.material.metalness = 0.85;
-      obj.material.roughness = 0.35;
     }
+    // Everything else — tyres, rims, frame, engine, exhaust — carries its own
+    // material from the GLB now, so there is nothing here to second-guess.
     obj.material.needsUpdate = true;
   });
 
@@ -514,9 +509,9 @@ document.getElementById('btn-clear-all').addEventListener('click', () => {
 // ---------- views ----------
 const VIEWS = {
   'btn-reset': [DEFAULT_CAM.pos.toArray(), DEFAULT_CAM.tgt.toArray()],
-  'btn-side':  [[2.4, 1.05, 1.6], [0, 0.55, 0]],
-  'btn-front': [[0, 0.95, 3.4],   [0, 0.6, 0.4]],
-  'btn-rear':  [[0, 1.15, -3.2],  [0, 0.55, -0.4]],
+  'btn-side':  [[3.00, 0.78, 0.04], [0, 0.62, -0.05]],
+  'btn-front': [[0.55, 0.92, 2.95], [0, 0.66, 0.30]],
+  'btn-rear':  [[-0.75, 1.00, -2.80], [0, 0.60, -0.50]],
 };
 for (const [id, [pos, tgt]] of Object.entries(VIEWS)) {
   document.getElementById(id).addEventListener('click', () => {
