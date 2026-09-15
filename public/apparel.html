@@ -48,7 +48,12 @@ h1{font-family:'Oswald',sans-serif;font-size:34px;font-weight:600;letter-spacing
 @media(max-width:520px){.views{grid-template-columns:1fr;}}
 .view{position:relative;}
 .view-label{font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;}
-svg.garment-svg{width:100%;height:auto;display:block;background:#0d0e11;border-radius:8px;}
+/* A studio backdrop rather than near-black. The garment defaults to a dark
+   colour, and on a #0d0e11 panel that left only the red outline visible — the
+   preview read as a technical drawing instead of a jersey. */
+svg.garment-svg{width:100%;height:auto;display:block;border-radius:8px;
+  background:radial-gradient(120% 90% at 50% 18%, #2b3038 0%, #191c22 55%, #101216 100%);}
+svg.garment-svg .panel-hit{cursor:pointer;}
 
 /* zones */
 .zone-list{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
@@ -94,6 +99,32 @@ table.roster input,table.roster select{padding:6px 8px;font-size:13px;}
 .tier-note{font-size:12px;color:var(--accent-2);margin-top:6px;}
 .tiers{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
 .tier{font-size:11px;font-family:'Oswald',sans-serif;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:4px 9px;color:var(--text-dim);}
+
+/* Colour swatches. A hex field is a developer's idea of picking a colour:
+   you cannot see what you are choosing until you have already typed it. */
+.swatches{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px;}
+.swatch{width:30px;height:30px;border-radius:8px;border:2px solid var(--line);cursor:pointer;padding:0;
+  position:relative;transition:transform .12s,border-color .12s;}
+.swatch:hover{transform:translateY(-2px);}
+.swatch[aria-pressed="true"]{border-color:var(--accent-2);box-shadow:0 0 0 2px rgba(255,138,30,.28);}
+.swatch:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px;}
+input[type=color]{width:44px;height:30px;padding:2px;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:8px;cursor:pointer;}
+
+/* Artwork placement controls */
+.garment-svg{touch-action:none;}
+.garment-svg.dragging{cursor:grabbing;}
+.art-ctrl{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);}
+.art-ctrl .ctrl-row{margin-bottom:10px;}
+.art-ctrl .ctrl-row label{display:flex;justify-content:space-between;align-items:baseline;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);margin-bottom:5px;}
+.art-ctrl input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:999px;background:var(--line);outline:none;}
+.art-ctrl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent-2);cursor:pointer;border:0;}
+.art-ctrl input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent-2);cursor:pointer;border:0;}
+.art-ctrl input[type=range]:focus-visible{outline:2px solid var(--accent-2);outline-offset:3px;}
+.art-ctrl .btn-row{display:flex;gap:8px;margin-top:12px;}
+.btn-sm{font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer;}
+.btn-sm:hover{border-color:var(--accent-2);color:var(--accent-2);}
+.btn-sm:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px;}
 .tier.on{border-color:var(--accent-2);color:var(--accent-2);}
 
 .err{color:var(--accent);font-size:13px;margin-top:8px;display:none;}
@@ -149,15 +180,20 @@ footer{margin-top:38px;font-size:12px;color:var(--text-dim);text-align:center;}
         <div class="hint" id="art-hint">PNG, JPG or SVG. We check resolution before you pay &mdash; not after.</div>
       </div>
 
+      <div id="art-controls" hidden></div>
+
       <div class="field-row">
         <div class="field">
-          <label for="base-col">Garment colour</label>
-          <input type="text" id="base-col" value="#1b1d22" list="cols">
-          <datalist id="cols"><option value="#1b1d22"><option value="#e2231a"><option value="#f2f3f5"><option value="#1e4fd8"><option value="#128a3f"></datalist>
+          <label>Garment colour</label>
+          <div class="swatches" id="base-swatches">
+            <input type="color" id="base-col" value="#2f3742" aria-label="Custom garment colour">
+          </div>
         </div>
         <div class="field">
-          <label for="trim-col">Trim colour</label>
-          <input type="text" id="trim-col" value="#e2231a" list="cols">
+          <label>Trim colour</label>
+          <div class="swatches" id="trim-swatches">
+            <input type="color" id="trim-col" value="#e2231a" aria-label="Custom trim colour">
+          </div>
         </div>
       </div>
     </div>
@@ -329,6 +365,20 @@ function shapeFor(kind, view){
   };
 }
 
+// Scale that makes the artwork sit fully inside the panel. Contain, not cover:
+// a chest print that has had its edges cropped to fill a rectangle is not what
+// anyone asked for, and the dashed outline said the whole thing would fit.
+function baseScaleFor(r, img){
+  return Math.min(r.w / img.w, r.h / img.h);
+}
+
+function artTransform(r, img){
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  const s = baseScaleFor(r, img) * img.scaleMult;
+  return `translate(${img.panX},${img.panY}) translate(${cx},${cy}) `
+       + `rotate(${img.rot}) scale(${s}) translate(${-img.w / 2},${-img.h / 2})`;
+}
+
 function renderPreview(){
   const g = garment();
   const shape = shapeFor(g.kind, "front");
@@ -338,8 +388,26 @@ function renderPreview(){
   for(const view of ["front","back"]){
     const svg = $("svg-" + view);
     const parts = [];
-    parts.push(`<defs><clipPath id="body-${view}"><path d="${shape.body}"/></clipPath></defs>`);
-    parts.push(`<path d="${shape.body}" fill="${escapeAttr(base)}" stroke="${escapeAttr(trim)}" stroke-width="3"/>`);
+    // Fabric shading and a contact shadow. A flat fill on a flat background is
+    // what made this read as a wireframe: the eye needs the garment to sit in
+    // front of something and to have a lit side.
+    parts.push(
+      `<defs>`
+      + `<clipPath id="body-${view}"><path d="${shape.body}"/></clipPath>`
+      + `<linearGradient id="fab-${view}" x1="0" y1="0" x2="0.35" y2="1">`
+      +   `<stop offset="0%" stop-color="#fff" stop-opacity=".16"/>`
+      +   `<stop offset="45%" stop-color="#fff" stop-opacity=".03"/>`
+      +   `<stop offset="100%" stop-color="#000" stop-opacity=".28"/>`
+      + `</linearGradient>`
+      + `<radialGradient id="shadow-${view}" cx="0.5" cy="0.5" r="0.5">`
+      +   `<stop offset="0%" stop-color="#000" stop-opacity=".55"/>`
+      +   `<stop offset="100%" stop-color="#000" stop-opacity="0"/>`
+      + `</radialGradient>`
+      + `</defs>`
+    );
+    parts.push(`<ellipse cx="150" cy="342" rx="96" ry="13" fill="url(#shadow-${view})"/>`);
+    parts.push(`<path d="${shape.body}" fill="${escapeAttr(base)}" stroke="${escapeAttr(trim)}" stroke-width="2" stroke-linejoin="round"/>`);
+    parts.push(`<path d="${shape.body}" fill="url(#fab-${view})" pointer-events="none"/>`);
 
     for(const z of zonesFor()){
       if(z.view !== view) continue;
@@ -347,15 +415,47 @@ function renderPreview(){
       if(!r) continue;
       const img = state.art[z.id];
       if(img){
-        parts.push(`<image href="${img.dataUrl}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" preserveAspectRatio="xMidYMid meet" clip-path="url(#body-${view})"/>`);
+        // Same transform order the kit builder uses: pan, then rotate and
+        // scale about the panel centre. Written out rather than shared because
+        // these are two separate pages with no bundler between them.
+        const t = artTransform(r, img);
+        parts.push(
+          `<g clip-path="url(#body-${view})"><g transform="${t}">`
+          + `<image href="${img.dataUrl}" x="0" y="0" width="${img.w}" height="${img.h}"/>`
+          + `</g></g>`
+        );
+        // The panel outline stays visible while a zone is selected, so you can
+        // see how far past the printable area you have dragged something.
+        if(z.id === state.zone){
+          parts.push(`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="none" stroke="${escapeAttr(trim)}" stroke-width="1.5" stroke-dasharray="5 4" opacity=".55" pointer-events="none"/>`);
+        }
       } else {
-        parts.push(`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="none" stroke="${escapeAttr(trim)}" stroke-width="1.5" stroke-dasharray="5 4" opacity=".7"/>`);
-        // A long label in a narrow zone spills outside the garment, so drop it
-        // below the box rather than centring it inside.
-        const narrow = r.w < z.label.length * 7;
-        const ly = narrow ? r.y + r.h + 12 : r.y + r.h/2 + 4;
-        parts.push(`<text x="${r.x + r.w/2}" y="${ly}" text-anchor="middle" font-family="Oswald,sans-serif" font-size="${narrow ? 9 : 11}" fill="${escapeAttr(trim)}" opacity=".85">${escapeHTML(z.label.toUpperCase())}</text>`);
+        // An empty panel is an invitation, so it says what it is and what it
+        // costs you nothing to try. The selected one is filled and solid; the
+        // rest stay quiet so the garment does not turn into a grid of boxes.
+        const on = z.id === state.zone;
+        parts.push(
+          `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="3"`
+          + ` fill="${on ? escapeAttr(trim) : "#ffffff"}" fill-opacity="${on ? ".14" : ".05"}"`
+          + ` stroke="${escapeAttr(trim)}" stroke-width="${on ? 2 : 1.2}"`
+          + ` stroke-dasharray="${on ? "none" : "5 4"}" opacity="${on ? "1" : ".6"}"/>`
+        );
+        // Only the selected panel is labelled. Labelling every panel was what
+        // pushed "SLEEVES" off the side of the garment, and three captions on
+        // a small jersey is noise rather than help.
+        if(on){
+          const narrow = r.w < z.label.length * 7;
+          const ly = narrow ? r.y + r.h + 11 : r.y + r.h/2 + 4;
+          parts.push(`<text x="${Math.min(Math.max(r.x + r.w/2, 40), 260)}" y="${ly}" text-anchor="middle" font-family="Oswald,sans-serif" font-size="${narrow ? 9 : 10}" letter-spacing="1" fill="${escapeAttr(trim)}">${escapeHTML(z.label.toUpperCase())}</text>`);
+        }
       }
+      // Clicking the panel on the garment selects it. Hunting for the matching
+      // row in a list underneath is the least direct way to say "this bit".
+      parts.push(
+        `<rect class="panel-hit" data-zone="${escapeAttr(z.id)}"`
+        + ` x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="transparent">`
+        + `<title>${escapeHTML(z.label)} — ${z.cm[0]}×${z.cm[1]}cm</title></rect>`
+      );
     }
 
     // Rider name/number preview on the back of tops, using the first roster row.
@@ -366,6 +466,158 @@ function renderPreview(){
     }
     svg.innerHTML = parts.join("");
   }
+}
+
+// Colours a race jersey is actually printed in, rather than five arbitrary hex
+// codes. The colour input beside them stays for anything not on the list.
+const GARMENT_COLS = ["#2f3742","#101216","#f2f3f5","#e2231a","#1e4fd8","#128a3f"];
+const TRIM_COLS    = ["#e2231a","#ff8a1e","#f2f3f5","#101216","#1e4fd8","#f5c518"];
+
+function renderSwatches(){
+  for(const [boxId, cols, inputId] of [
+    ["base-swatches", GARMENT_COLS, "base-col"],
+    ["trim-swatches", TRIM_COLS, "trim-col"],
+  ]){
+    const box = $(boxId), input = $(inputId);
+    // The colour input lives in this row too, so clear only the swatches and
+    // insert before it — rebuilding the whole row would delete the input.
+    box.querySelectorAll(".swatch").forEach(el => el.remove());
+    for(const c of cols){
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "swatch";
+      b.style.background = c;
+      b.title = c;
+      b.setAttribute("aria-label", "Colour " + c);
+      b.setAttribute("aria-pressed", input.value.toLowerCase() === c ? "true" : "false");
+      b.addEventListener("click", ()=>{ input.value = c; renderSwatches(); renderPreview(); });
+      box.insertBefore(b, input);
+    }
+  }
+}
+
+// One place that changes the selected panel, because two now do it: the list
+// underneath and the panel itself on the garment.
+function selectZoneById(id){
+  const z = zonesFor().find(x => x.id === id);
+  if(!z) return;
+  state.zone = id;
+  $("zone-target").textContent = z.label;
+  renderZones();
+  renderArtControls();
+  updateArtHint(id);
+  renderPreview();
+}
+
+function renderArtControls(){
+  const box = $("art-controls");
+  const a = state.art[state.zone];
+  const zone = zonesFor().find(z => z.id === state.zone);
+  if(!a || !zone){ box.hidden = true; box.innerHTML = ""; return; }
+
+  box.hidden = false;
+  box.innerHTML = `
+    <div class="art-ctrl">
+      <div class="ctrl-row">
+        <label for="ctrl-scale"><span>Size</span><span id="scale-val">${Math.round(a.scaleMult*100)}%</span></label>
+        <input type="range" id="ctrl-scale" min="0.3" max="3" step="0.01" value="${a.scaleMult}">
+      </div>
+      <div class="ctrl-row">
+        <label for="ctrl-rot"><span>Rotate</span><span id="rot-val">${a.rot}°</span></label>
+        <input type="range" id="ctrl-rot" min="-45" max="45" step="1" value="${a.rot}">
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn-sm" id="btn-fit">Fit to panel</button>
+        <button type="button" class="btn-sm" id="btn-remove">Remove</button>
+      </div>
+      <div class="hint">Drag the artwork on the preview to move it.</div>
+    </div>`;
+
+  const scale = $("ctrl-scale"), rot = $("ctrl-rot");
+  scale.addEventListener("input", ()=>{
+    a.scaleMult = parseFloat(scale.value);
+    $("scale-val").textContent = Math.round(a.scaleMult*100) + "%";
+    // Scaling changes the printed size, so the resolution verdict changes too.
+    updateArtHint(state.zone);
+    renderPreview();
+  });
+  rot.addEventListener("input", ()=>{
+    a.rot = parseFloat(rot.value);
+    $("rot-val").textContent = a.rot + "°";
+    renderPreview();
+  });
+  $("btn-fit").addEventListener("click", ()=>{
+    a.panX = 0; a.panY = 0; a.rot = 0; a.scaleMult = 1;
+    updateArtHint(state.zone);
+    renderArtControls(); renderPreview();
+  });
+  $("btn-remove").addEventListener("click", ()=>{
+    delete state.art[state.zone];
+    $("art").value = "";
+    $("art-hint").style.color = "";
+    $("art-hint").textContent = "PNG, JPG or SVG. We check resolution before you pay — not after.";
+    renderZones(); renderArtControls(); renderPreview(); refreshSubmit();
+  });
+}
+
+// Drag to move the artwork, on whichever view the selected panel lives on.
+// Dragging the front while a back panel is selected would silently move
+// something you cannot see, so it only acts when the views match.
+function attachDrag(view){
+  const svg = $("svg-" + view);
+  let dragging = false, start = null, startPan = null;
+
+  function toSVG(e){
+    const ctm = svg.getScreenCTM();
+    if(!ctm) return null;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    const p = pt.matrixTransform(ctm.inverse());
+    return { x: p.x, y: p.y };
+  }
+  function active(){
+    const z = zonesFor().find(x => x.id === state.zone);
+    if(!z || z.view !== view) return null;
+    return state.art[z.id] || null;
+  }
+
+  // Clicking a panel on the garment selects it.
+  svg.addEventListener("click", (e)=>{
+    const hit = e.target.closest && e.target.closest(".panel-hit");
+    if(!hit) return;
+    const id = hit.getAttribute("data-zone");
+    if(!id || id === state.zone) return;
+    selectZoneById(id);
+  });
+
+  svg.addEventListener("pointerdown", (e)=>{
+    // A press on some other panel is a selection, not a drag: starting one
+    // would shove the artwork you already placed while you were trying to
+    // point at a different part of the garment.
+    const hit = e.target.closest && e.target.closest(".panel-hit");
+    if(hit && hit.getAttribute("data-zone") !== state.zone) return;
+    const a = active();
+    if(!a) return;
+    const p = toSVG(e);
+    if(!p) return;
+    dragging = true;
+    start = p;
+    startPan = { x: a.panX, y: a.panY };
+    svg.classList.add("dragging");
+    svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener("pointermove", (e)=>{
+    if(!dragging) return;
+    const a = active();
+    const p = toSVG(e);
+    if(!a || !p) return;
+    a.panX = startPan.x + (p.x - start.x);
+    a.panY = startPan.y + (p.y - start.y);
+    renderPreview();
+  });
+  function end(){ dragging = false; svg.classList.remove("dragging"); }
+  svg.addEventListener("pointerup", end);
+  svg.addEventListener("pointercancel", end);
 }
 
 function renderZones(){
@@ -380,7 +632,7 @@ function renderZones(){
     row.setAttribute("role", "button");
     row.tabIndex = 0;
     row.setAttribute("aria-pressed", z.id === state.zone ? "true" : "false");
-    const selectZone = () => { state.zone = z.id; renderZones(); $("zone-target").textContent = z.label; };
+    const selectZone = () => selectZoneById(z.id);
     row.addEventListener("click", selectZone);
     row.addEventListener("keydown", (e)=>{
       if(e.key === "Enter" || e.key === " "){ e.preventDefault(); selectZone(); }
@@ -521,31 +773,53 @@ $("art").addEventListener("change", async ()=>{
   const zone = zonesFor().find(z => z.id === state.zone);
   try{
     const { dataUrl, w, h } = await readImage(f);
-    state.art[state.zone] = { dataUrl, w, h, name: f.name };
+    // panX/panY/rot/scaleMult are the placement the customer sets by dragging
+    // the artwork and moving the sliders. They start neutral: centred in the
+    // panel, unrotated, scaled to sit inside it — which is what the dashed
+    // panel outline promises before anything is uploaded.
+    state.art[state.zone] = {
+      dataUrl, w, h, name: f.name,
+      isVector: f.type === "image/svg+xml",
+      panX: 0, panY: 0, rot: 0, scaleMult: 1,
+    };
 
-    const isVector = f.type === "image/svg+xml";
-    const [cmW, cmH] = zone.cm;
-    const dpiW = w / (cmW / 2.54);
-    const dpiH = h / (cmH / 2.54);
-    const dpi = Math.min(dpiW, dpiH);
-
-    const hint = $("art-hint");
-    if(isVector){
-      hint.style.color = "var(--success)";
-      hint.textContent = `Vector artwork — scales to any print size cleanly.`;
-    } else if(dpi >= MIN_DPI){
-      hint.style.color = "var(--success)";
-      hint.textContent = `${w}×${h}px → about ${Math.round(dpi)} DPI at ${cmW}×${cmH}cm. Good for print.`;
-    } else {
-      hint.style.color = "var(--accent-2)";
-      hint.textContent = `${w}×${h}px is only about ${Math.round(dpi)} DPI at ${cmW}×${cmH}cm — below our ${MIN_DPI} DPI floor, so it will look soft. Upload a larger file or vector art.`;
-    }
-    renderZones(); renderPreview(); refreshSubmit();
+    updateArtHint(state.zone);
+    renderZones(); renderArtControls(); renderPreview(); refreshSubmit();
   }catch(e){
     $("art-hint").style.color = "var(--accent)";
     $("art-hint").textContent = "That file could not be read as an image.";
   }
 });
+
+// The printed size is the panel size multiplied by whatever the customer has
+// scaled the artwork to, so this has to be recomputed every time that slider
+// moves. Working it out once at upload and leaving it there is how someone
+// blows a 200px logo up to 300% and still reads "Good for print".
+function updateArtHint(zoneId){
+  const zone = zonesFor().find(z => z.id === zoneId);
+  const a = state.art[zoneId];
+  const hint = $("art-hint");
+  if(!zone || !a){ hint.textContent = ""; return; }
+
+  const [cmW, cmH] = zone.cm;
+  const printW = cmW * a.scaleMult;
+  const printH = cmH * a.scaleMult;
+  const dpi = Math.min(a.w / (printW / 2.54), a.h / (printH / 2.54));
+  const at = a.scaleMult === 1
+    ? `${cmW}×${cmH}cm`
+    : `${printW.toFixed(1)}×${printH.toFixed(1)}cm at ${Math.round(a.scaleMult * 100)}%`;
+
+  if(a.isVector){
+    hint.style.color = "var(--success)";
+    hint.textContent = "Vector artwork — scales to any print size cleanly.";
+  } else if(dpi >= MIN_DPI){
+    hint.style.color = "var(--success)";
+    hint.textContent = `${a.w}×${a.h}px → about ${Math.round(dpi)} DPI at ${at}. Good for print.`;
+  } else {
+    hint.style.color = "var(--accent-2)";
+    hint.textContent = `${a.w}×${a.h}px is only about ${Math.round(dpi)} DPI at ${at} — below our ${MIN_DPI} DPI floor, so it will look soft. Scale it down, or upload a larger file or vector art.`;
+  }
+}
 
 function readImage(file){
   return new Promise((resolve, reject)=>{
@@ -622,7 +896,28 @@ $("submit").addEventListener("click", async ()=>{
     const zonesOut = {};
     for(const [zid, a] of Object.entries(state.art)){
       const z = zonesFor().find(x => x.id === zid);
-      zonesOut[zid] = { label: z ? z.label : zid, file: a.name, px:[a.w, a.h], cm: z ? z.cm : null };
+      // The placement goes with the order. Without it the customer positions
+      // artwork on screen, approves what they see, and the print shop receives
+      // a file and a panel name with no idea where on the panel it sat — so
+      // the approval would be of something nobody could reproduce.
+      zonesOut[zid] = {
+        label: z ? z.label : zid,
+        file: a.name,
+        px: [a.w, a.h],
+        cm: z ? z.cm : null,
+        placement: {
+          pan_x: Math.round(a.panX * 100) / 100,
+          pan_y: Math.round(a.panY * 100) / 100,
+          rotate_deg: a.rot,
+          scale: a.scaleMult,
+          // What it actually prints at, which is the panel size times the
+          // scale — the number the print shop needs, not the panel default.
+          print_cm: z ? [
+            Math.round(z.cm[0] * a.scaleMult * 10) / 10,
+            Math.round(z.cm[1] * a.scaleMult * 10) / 10,
+          ] : null,
+        },
+      };
     }
 
     // Same shape migration 003 mints server-side, so the id format does not
@@ -693,9 +988,17 @@ $("submit").addEventListener("click", async ()=>{
 function escapeHTML(s){ return String(s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
 function escapeAttr(s){ return escapeHTML(s); }
 
-function renderAll(){ renderGarments(); renderZones(); renderRoster(); renderPrice(); renderPreview(); refreshSubmit(); }
+function renderAll(){ renderGarments(); renderSwatches(); renderZones(); renderArtControls(); renderRoster(); renderPrice(); renderPreview(); refreshSubmit(); }
 
-["base-col","trim-col"].forEach(id => $(id).addEventListener("input", renderPreview));
+attachDrag("front");
+attachDrag("back");
+
+// Typing a custom colour has to clear whichever swatch was showing as chosen,
+// or two colours claim to be selected at once.
+["base-col","trim-col"].forEach(id => $(id).addEventListener("input", ()=>{
+  renderSwatches();
+  renderPreview();
+}));
 ["f-name","f-email","f-club"].forEach(id => $(id).addEventListener("input", refreshSubmit));
 $("add-rider").addEventListener("click", addRider);
 
