@@ -237,7 +237,7 @@ footer{margin-top:38px;font-size:12px;color:var(--text-dim);text-align:center;}
     </div>
   </div>
 
-  <footer id="fx-foot">StreetSweeperCustoms &middot; custom racewear &middot; priced in Thai baht; USD shown for reference</footer>
+  <footer id="fx-foot"><span id="fx-text">StreetSweeperCustoms &middot; custom racewear &middot; priced in Thai baht; USD shown for reference</span> &middot; <a href="/privacy">Privacy</a> &middot; <a href="/terms">Terms</a></footer>
 </div>
 
 <script>
@@ -1002,7 +1002,9 @@ attachDrag("back");
 ["f-name","f-email","f-club"].forEach(id => $(id).addEventListener("input", refreshSubmit));
 $("add-rider").addEventListener("click", addRider);
 
-document.getElementById("fx-foot").textContent =
+// Only the rate text is rewritten. Setting textContent on the footer itself
+// removed the privacy and terms links the moment the rate loaded.
+document.getElementById("fx-text").textContent =
   "StreetSweeperCustoms \u00b7 custom racewear \u00b7 priced in Thai baht \u00b7 USD shown for reference at \u0e3f" + THB_PER_USD + "/$1 (" + FX_AS_OF + ")";
 
 addRider();
