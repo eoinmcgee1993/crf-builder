@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-<title>CRF Garage — Custom Racewear Builder</title>
+<title>StreetSweeperCustoms — Custom Racewear Builder</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -144,6 +144,7 @@ footer{margin-top:38px;font-size:12px;color:var(--text-dim);text-align:center;}
     <a href="./apparel.html" class="is-active" aria-current="page">Racewear Builder</a>
     <a href="./ecu.html">ECU Template Builder</a>
     <a href="./mods.html">Modifications</a>
+    <a href="./mockup.html">Kit Mockup</a>
   </nav>
 
   <header class="top">
@@ -237,7 +238,7 @@ footer{margin-top:38px;font-size:12px;color:var(--text-dim);text-align:center;}
     </div>
   </div>
 
-  <footer id="fx-foot">CRF Garage &middot; custom racewear &middot; priced in Thai baht; USD shown for reference</footer>
+  <footer id="fx-foot">StreetSweeperCustoms &middot; <span id="fx-text">StreetSweeperCustoms &middot; custom racewear &middot; priced in Thai baht; USD shown for reference</span> &middot; <a href="/privacy">Privacy</a> &middot; <a href="/terms">Terms</a></footer>
 </div>
 
 <script>
@@ -346,6 +347,16 @@ function shapeFor(kind, view){
     return {
       body: "M78,96 L126,88 Q150,104 174,88 L222,96 L272,206 L242,236 L218,148 " +
             "L224,272 Q150,286 76,272 L82,148 L58,236 L28,206 Z",
+      // Collar, shoulder seams and cuffs. A jersey without them is a
+      // silhouette; these are what make the eye read it as a made thing.
+      seams: [
+        "M126,88 Q150,106 174,88",                     // collar
+        "M126,92 Q150,110 174,92",
+        "M82,148 Q92,120 126,100",                     // left shoulder seam
+        "M218,148 Q208,120 174,100",                   // right shoulder seam
+        "M58,236 L28,206", "M242,236 L272,206",        // cuff lines
+        "M76,272 Q150,286 224,272",                    // hem
+      ],
       zones: {
         chest:  {x:106, y:118, w:88, h:62},
         back:   {x:100, y:106, w:100, h:80},
@@ -358,6 +369,12 @@ function shapeFor(kind, view){
   // you have drawn shorts.
   return {
     body: "M95,40 L205,40 L218,140 L210,344 L162,344 L150,150 L138,344 L90,344 L82,140 Z",
+    seams: [
+      "M95,40 L205,40",                                // waistband
+      "M95,52 L205,52",
+      "M150,150 L150,344",                             // inseam
+      "M82,140 L218,140",                              // hip line
+    ],
     zones: {
       thigh: {x:96,  y:168, w:48, h:72},
       seat:  {x:152, y:150, w:54, h:66},
@@ -394,11 +411,18 @@ function renderPreview(){
     parts.push(
       `<defs>`
       + `<clipPath id="body-${view}"><path d="${shape.body}"/></clipPath>`
-      + `<linearGradient id="fab-${view}" x1="0" y1="0" x2="0.35" y2="1">`
-      +   `<stop offset="0%" stop-color="#fff" stop-opacity=".16"/>`
-      +   `<stop offset="45%" stop-color="#fff" stop-opacity=".03"/>`
-      +   `<stop offset="100%" stop-color="#000" stop-opacity=".28"/>`
+      + `<linearGradient id="fab-${view}" x1="0.1" y1="0" x2="0.8" y2="1">`
+      +   `<stop offset="0%" stop-color="#ffffff" stop-opacity=".30"/>`
+      +   `<stop offset="30%" stop-color="#ffffff" stop-opacity=".08"/>`
+      +   `<stop offset="62%" stop-color="#000000" stop-opacity=".18"/>`
+      +   `<stop offset="100%" stop-color="#000000" stop-opacity=".46"/>`
       + `</linearGradient>`
+      // A garment turns away from you at its edge. Without this the silhouette
+      // is a cut line and the whole thing reads as a drawing of a jersey.
+      + `<radialGradient id="edge-${view}" cx="0.5" cy="0.42" r="0.62">`
+      +   `<stop offset="55%" stop-color="#000" stop-opacity="0"/>`
+      +   `<stop offset="100%" stop-color="#000" stop-opacity=".40"/>`
+      + `</radialGradient>`
       + `<radialGradient id="shadow-${view}" cx="0.5" cy="0.5" r="0.5">`
       +   `<stop offset="0%" stop-color="#000" stop-opacity=".55"/>`
       +   `<stop offset="100%" stop-color="#000" stop-opacity="0"/>`
@@ -406,9 +430,11 @@ function renderPreview(){
       + `</defs>`
     );
     parts.push(`<ellipse cx="150" cy="342" rx="96" ry="13" fill="url(#shadow-${view})"/>`);
-    parts.push(`<path d="${shape.body}" fill="${escapeAttr(base)}" stroke="${escapeAttr(trim)}" stroke-width="2" stroke-linejoin="round"/>`);
-    parts.push(`<path d="${shape.body}" fill="url(#fab-${view})" pointer-events="none"/>`);
+    parts.push(`<path d="${shape.body}" fill="${escapeAttr(base)}" stroke="${escapeAttr(trim)}" stroke-width="1.4" stroke-linejoin="round"/>`);
 
+    // Artwork first, then the fabric shading over the top of it. Painting the
+    // shading under the print meant the print ignored the garment's light
+    // entirely and read as a sticker laid on a drawing.
     for(const z of zonesFor()){
       if(z.view !== view) continue;
       const r = shape.zones[z.id];
@@ -424,6 +450,29 @@ function renderPreview(){
           + `<image href="${img.dataUrl}" x="0" y="0" width="${img.w}" height="${img.h}"/>`
           + `</g></g>`
         );
+      }
+    }
+
+    // The same light across the whole garment, print included. Multiply keeps
+    // the artwork's own colour and only takes the shading, so a bright design
+    // stays bright on the lit shoulder and drops away into the shadowed side.
+    parts.push(`<g clip-path="url(#body-${view})" pointer-events="none">`
+      + `<path d="${shape.body}" fill="url(#fab-${view})" style="mix-blend-mode:multiply"/>`
+      + `<path d="${shape.body}" fill="url(#edge-${view})" style="mix-blend-mode:multiply"/>`
+      + `</g>`);
+    if(shape.seams){
+      parts.push(`<g fill="none" stroke="#000" stroke-opacity=".30" stroke-width="1" pointer-events="none">`
+        + shape.seams.map(d => `<path d="${d}"/>`).join("")
+        + `</g>`);
+    }
+    parts.push(`<path d="${shape.body}" fill="none" stroke="${escapeAttr(trim)}" stroke-width="1.4" stroke-linejoin="round" pointer-events="none"/>`);
+
+    for(const z of zonesFor()){
+      if(z.view !== view) continue;
+      const r = shape.zones[z.id];
+      if(!r) continue;
+      const img = state.art[z.id];
+      if(img){
         // The panel outline stays visible while a zone is selected, so you can
         // see how far past the printable area you have dragged something.
         if(z.id === state.zone){
@@ -1002,8 +1051,10 @@ attachDrag("back");
 ["f-name","f-email","f-club"].forEach(id => $(id).addEventListener("input", refreshSubmit));
 $("add-rider").addEventListener("click", addRider);
 
-document.getElementById("fx-foot").textContent =
-  "CRF Garage \u00b7 custom racewear \u00b7 priced in Thai baht \u00b7 USD shown for reference at \u0e3f" + THB_PER_USD + "/$1 (" + FX_AS_OF + ")";
+// Only the rate text is rewritten. Setting textContent on the footer itself
+// removed the privacy and terms links the moment the rate loaded.
+document.getElementById("fx-text").textContent =
+  "StreetSweeperCustoms \u00b7 custom racewear \u00b7 priced in Thai baht \u00b7 USD shown for reference at \u0e3f" + THB_PER_USD + "/$1 (" + FX_AS_OF + ")";
 
 addRider();
 renderAll();
