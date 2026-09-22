@@ -514,6 +514,14 @@ function stripeLinkFor(fulfilment, orderId){
 
 const [VB_X, VB_Y, VB_W, VB_H] = VIEWBOX.split(' ').map(Number);
 
+// Print geometry. The sheet's real size comes from the source template's own
+// measurement note. Everything a printer specifies is in millimetres, so the
+// conversion lives here instead of being spelled out at each use.
+const SHEET_W_CM = 237.688, SHEET_H_CM = 145.918;
+const UPMM = VB_W / (SHEET_W_CM * 10);   // user units per millimetre
+const BLEED_MM = 3;                      // ink carried past the cut line
+const CUT_COLOUR = "#FF00FF";            // 100% magenta, the CutContour convention
+
 const state = {
   selectedZone: null,
   designs: {}, // zoneId -> {img, natW, natH, baseScale, panX, panY, rot, scaleMult}
@@ -1334,42 +1342,122 @@ function refreshOrderState(){
   }
 }
 
-// Builds a real, standalone SVG of the kit as currently designed, using the
-// same nodes driving the live preview, so the file always matches what was shown.
+// Builds the print-and-cut file a vinyl printer actually needs: artwork at true
+// size with a 3 mm bleed, a cut path per panel on its own CutContour layer, a
+// weed border and registration marks.
+//
+// Built from the panel geometry and the placed designs, NOT by cloning the
+// on-screen map. The map paints panel fills and outlines to make itself
+// readable; cloning it shipped that grey chrome into the file, so a printer
+// received artwork sitting on grey rectangles with nothing to cut to.
 function buildExportSVG(orderId){
-  const src = document.getElementById('overview-svg');
-  const clone = src.cloneNode(true);
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-  // real-world size, taken from the source template's own measurement note
-  clone.setAttribute('width', '237.688cm');
-  clone.setAttribute('height', '145.918cm');
-  const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
-  bg.setAttribute('x', VB_X); bg.setAttribute('y', VB_Y);
-  bg.setAttribute('width', VB_W); bg.setAttribute('height', VB_H);
-  bg.setAttribute('fill', '#ffffff');
-  clone.insertBefore(bg, clone.firstChild);
+  const ns = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs) => {
+    const n = document.createElementNS(ns, tag);
+    for(const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
 
-  // The live page's colours come from an external stylesheet, which a
-  // downloaded standalone file doesn't carry with it. Bake the same
-  // colours in as inline attributes so the file looks right on its own —
-  // most importantly, the outline layer must be explicitly fill:none or
-  // it defaults to a solid black fill that blacks out the artwork underneath.
-  clone.querySelectorAll('.zone-shape').forEach(p=>{
-    p.setAttribute('fill', '#3a3d44');
-    p.setAttribute('stroke', '#54585f');
-    p.setAttribute('stroke-width', '260');
+  const svg = el('svg', {
+    xmlns: ns, 'xmlns:xlink': 'http://www.w3.org/1999/xlink',
+    viewBox: VIEWBOX, width: SHEET_W_CM + 'cm', height: SHEET_H_CM + 'cm',
   });
-  clone.querySelectorAll('.zone-edge').forEach(p=>{
-    p.setAttribute('fill', 'none');
-    p.setAttribute('stroke', '#8a8f97');
-    p.setAttribute('stroke-width', '220');
-  });
+  const title = el('title', {});
+  title.textContent = 'CRF250L kit — order ' + orderId;
+  svg.appendChild(title);
 
-  const title = document.createElementNS('http://www.w3.org/2000/svg','title');
-  title.textContent = 'CRF250L kit \u2014 order ' + orderId;
-  clone.insertBefore(title, clone.firstChild);
-  return new XMLSerializer().serializeToString(clone);
+  const defs = el('defs', {});
+  svg.appendChild(defs);
+
+  // Only panels the customer actually designed. An untouched panel was not
+  // bought, so it is neither printed nor cut.
+  const placed = ZONES.filter(z => state.designs[z.id]);
+
+  // Vinyl prints on white stock. A transparent background reads as "no ink"
+  // to some RIPs and as black to others, so say which it is.
+  svg.appendChild(el('rect', {x:VB_X, y:VB_Y, width:VB_W, height:VB_H, fill:'#ffffff'}));
+
+  // -- printed layer ---------------------------------------------------
+  const art = el('g', {id:'Artwork'});
+  placed.forEach(z => {
+    const d = state.designs[z.id], bb = state.zoneBBox[z.id];
+
+    // A mask, not a clipPath: clipping uses fill geometry only and ignores
+    // stroke, and the stroke is what grows the panel by the bleed. Filled and
+    // stroked white gives the panel outline plus BLEED_MM on every side.
+    // Bound it to the panel, not the sheet — a sheet-sized mask makes a
+    // renderer allocate a 2.4 m buffer per panel, which is enough to run some
+    // of them out of memory before the file ever reaches a RIP.
+    const pad = 2 * BLEED_MM * UPMM;
+    const mask = el('mask', {id:'bleed-'+z.id, maskUnits:'userSpaceOnUse',
+                             x:bb.x-pad, y:bb.y-pad,
+                             width:bb.w+2*pad, height:bb.h+2*pad});
+    pathsFor(z).forEach(dd => mask.appendChild(el('path', {
+      d: dd, fill:'#ffffff', stroke:'#ffffff',
+      'stroke-width': (2 * BLEED_MM * UPMM).toFixed(2),
+      'stroke-linejoin':'round',
+    })));
+    defs.appendChild(mask);
+
+    const cx = bb.x + bb.w/2, cy = bb.y + bb.h/2;
+    const s = d.baseScale * d.scaleMult;
+    const holder = el('g', {mask:'url(#bleed-'+z.id+')'});
+    const imgGrp = el('g', {transform:
+      `translate(${d.panX},${d.panY}) translate(${cx},${cy}) rotate(${d.rot}) `
+      + `scale(${s}) translate(${-d.natW/2},${-d.natH/2})`});
+    const img = el('image', {x:0, y:0, width:d.natW, height:d.natH});
+    img.setAttribute('href', d.img);
+    img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', d.img);
+    imgGrp.appendChild(img);
+    holder.appendChild(imgGrp);
+    art.appendChild(holder);
+  });
+  svg.appendChild(art);
+
+  // -- cut layer -------------------------------------------------------
+  // Named CutContour and stroked 100% magenta, the convention VersaWorks,
+  // Onyx, Caldera and Flexi all read as "cut this, do not print it". SVG has
+  // no spot colours, so a printer may still map the name once on import; the
+  // layer name and the magenta are the hooks that let them.
+  const cut = el('g', {id:'CutContour', fill:'none', stroke:CUT_COLOUR,
+                       'stroke-width': (0.25 * UPMM).toFixed(2)});
+  const cutTitle = el('title', {});
+  cutTitle.textContent = 'CutContour';
+  cut.appendChild(cutTitle);
+  placed.forEach(z => pathsFor(z).forEach(dd => cut.appendChild(el('path', {d:dd}))));
+
+  // Weed border, so the waste vinyl lifts off the backing in one piece instead
+  // of being picked out around every panel. Only when it actually fits inside
+  // the media: a full kit fills the sheet, and a border drawn round that lands
+  // off the media entirely, which is a cut the plotter cannot make.
+  if(placed.length){
+    let x0=Infinity, y0=Infinity, x1=-Infinity, y1=-Infinity;
+    placed.forEach(z => {
+      const b = state.zoneBBox[z.id];
+      x0=Math.min(x0,b.x); y0=Math.min(y0,b.y);
+      x1=Math.max(x1,b.x+b.w); y1=Math.max(y1,b.y+b.h);
+    });
+    const m = 12 * UPMM, edge = 5 * UPMM;
+    const bx = x0-m, by = y0-m, bw = (x1-x0)+2*m, bh = (y1-y0)+2*m;
+    if(bx >= VB_X+edge && by >= VB_Y+edge
+       && bx+bw <= VB_X+VB_W-edge && by+bh <= VB_Y+VB_H-edge){
+      cut.appendChild(el('rect', {x:bx, y:by, width:bw, height:bh}));
+    }
+  }
+  svg.appendChild(cut);
+
+  // -- registration marks ----------------------------------------------
+  // Marks at the media corners, 10 mm in. Mark geometry is machine specific,
+  // so a printer will often drop these for their own; keeping them on their
+  // own layer makes that one delete rather than a hunt.
+  const reg = el('g', {id:'RegistrationMarks', fill:'#000000'});
+  const r = 2.5 * UPMM, inset = 10 * UPMM;
+  [[VB_X+inset, VB_Y+inset], [VB_X+VB_W-inset, VB_Y+inset],
+   [VB_X+inset, VB_Y+VB_H-inset], [VB_X+VB_W-inset, VB_Y+VB_H-inset]]
+    .forEach(([cx,cy]) => reg.appendChild(el('circle', {cx, cy, r})));
+  svg.appendChild(reg);
+
+  return new XMLSerializer().serializeToString(svg);
 }
 
 function triggerDownload(filename, content, mime){
