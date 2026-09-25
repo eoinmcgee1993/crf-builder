@@ -281,21 +281,10 @@ input[type=range]::-webkit-slider-thumb{
 .preset.sel span{color:var(--text);}
 @media(max-width:520px){.preset-row{grid-template-columns:repeat(2,1fr);}}
 .bike-preview{margin-top:16px;}
-.bike-preview .map-svg-wrap{margin-top:10px;}
-#bike-svg{width:100%;height:auto;display:block;}
-.bike-line{fill:none;stroke:#6f7681;stroke-width:6;stroke-linecap:round;stroke-linejoin:round;}
-.bike-thin{fill:none;stroke:#666d78;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;}
-.bike-tube{fill:none;stroke:#828a96;stroke-width:9;stroke-linecap:round;stroke-linejoin:round;}
-.bike-pipe{fill:none;stroke:#767d88;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;}
-.bike-fill{fill:#383d47;stroke:#7c848f;stroke-width:4;stroke-linejoin:round;}
-.bike-mass{fill:#454b56;stroke:#8b939f;stroke-width:4;stroke-linejoin:round;}
-.bike-tyre{fill:none;stroke:#2b2f36;stroke-width:30;}
-.bike-rim{fill:none;stroke:#79808b;stroke-width:4;}
-.bike-hub{fill:#454b56;stroke:#79808b;stroke-width:4;}
-.bike-disc{fill:none;stroke:#4f5661;stroke-width:3;}
-.bike-spoke{stroke:#474d57;stroke-width:2;}
-.bike-panel-blank{fill:#3a3d44;stroke:#e2231a;stroke-width:2.5;stroke-linejoin:round;}
-.bike-panel-edge{fill:none;stroke:#e2231a;stroke-width:2.5;stroke-linejoin:round;}
+.bike-stage{margin-top:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#0d0e11;}
+#bike-canvas{display:block;width:100%;height:auto;}
+#bike-note{margin-top:8px;}
+
 
 /* ── SHARED SITE NAV ─────────────────────── */
 .site-nav{
@@ -321,7 +310,6 @@ input[type=range]::-webkit-slider-thumb{
 
   <nav class="site-nav" aria-label="Site sections">
     <a href="./index.html" class="is-active" aria-current="page">Graphics Kit Builder</a>
-    <a href="./mockup.html">Kit Mockup</a>
     <a href="./apparel.html">Racewear Builder</a>
     <a href="./ecu.html">ECU Template Builder</a>
     <a href="./mods.html">Modifications</a>
@@ -335,7 +323,7 @@ input[type=range]::-webkit-slider-thumb{
   <div class="grid">
     <div class="card">
       <h2>Panel map &middot; live preview</h2>
-      <p class="hint">Tap a panel to work on it. As you place designs, this map fills in with them, so it doubles as a preview of the assembled kit, built from the real cut lines, not a mockup photo.</p>
+      <p class="hint">Tap a panel to work on it. As you place designs, this map fills in with them, so it doubles as a preview of the assembled kit, built from the real cut lines.</p>
       <div class="map-svg-wrap">
         <svg id="overview-svg" viewBox="0 0 229698.95 141090.28" xmlns="http://www.w3.org/2000/svg"></svg>
       </div>
@@ -357,10 +345,11 @@ input[type=range]::-webkit-slider-thumb{
 
       <div class="bike-preview">
         <div class="kitwide-title">On the bike</div>
-        <p class="hint">The right-hand side, with your panels sitting where they actually land on a CRF250L. Same cut geometry as the map above &mdash; the bike underneath is a line drawing, so nothing here depends on a photo.</p>
-        <div class="map-svg-wrap">
-          <svg id="bike-svg" viewBox="0 0 1000 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kit shown on a CRF250L side profile"></svg>
+        <p class="hint">Your panels wrapped onto a bike with blank plastics and re-lit by its own highlights and shadows, so the design sits on the plastic instead of floating over it. The map above is what actually gets cut; this is what it will look like once it is on.</p>
+        <div class="bike-stage">
+          <canvas id="bike-canvas" role="img" aria-label="Your kit shown on a CRF side profile"></canvas>
         </div>
+        <p class="hint" id="bike-note"></p>
       </div>
 
       <div class="zone-list" id="zone-list"></div>
@@ -514,6 +503,14 @@ function stripeLinkFor(fulfilment, orderId){
 
 const [VB_X, VB_Y, VB_W, VB_H] = VIEWBOX.split(' ').map(Number);
 
+// Print geometry. The sheet's real size comes from the source template's own
+// measurement note. Everything a printer specifies is in millimetres, so the
+// conversion lives here instead of being spelled out at each use.
+const SHEET_W_CM = 237.688, SHEET_H_CM = 145.918;
+const UPMM = VB_W / (SHEET_W_CM * 10);   // user units per millimetre
+const BLEED_MM = 3;                      // ink carried past the cut line
+const CUT_COLOUR = "#FF00FF";            // 100% magenta, the CutContour convention
+
 const state = {
   selectedZone: null,
   designs: {}, // zoneId -> {img, natW, natH, baseScale, panX, panY, rot, scaleMult}
@@ -550,7 +547,7 @@ function buildOverview(){
 // as a live "assembled kit" preview built from the real cut geometry —
 // no bike photo involved, so nothing here depends on image rights.
 function updateOverviewZone(zoneId){
-  updateBikeZone(zoneId);
+  syncMockupArt(zoneId);
   const ns = 'http://www.w3.org/2000/svg';
   const design = state.designs[zoneId];
   const g = document.querySelector('.zone-group[data-zone="'+zoneId+'"]');
@@ -620,171 +617,213 @@ function updateOverviewZone(zoneId){
     `translate(${design.panX},${design.panY}) translate(${cx},${cy}) rotate(${design.rot}) scale(${s}) translate(${-design.natW/2},${-design.natH/2})`);
 }
 
-// ── On-bike preview ─────────────────────────────────────────────────────────
-// A CRF250L side profile drawn from primitives, with the right-side panels
-// placed where they sit on the bike. Each panel keeps its real cut outline and
-// its share of the design; only its position and scale change, so what you see
-// is the same geometry that gets cut.
-// ── On-bike preview ─────────────────────────────────────────────────────────
-// A panel is cut flat, which is a 2D unwrap of a 3D part -- you cannot rotate a
-// cut outline into a side view and get the shape the eye expects. So the bike
-// view carries its own silhouettes, drawn as the panel appears from the side,
-// and the artwork is laid across them as one piece. The panel map above stays
-// the authority on what actually gets cut; this is what it will look like.
-const BIKE_SIDE = {
-  "front-fender":     "M700,262 Q790,232 892,228 L898,248 Q792,254 706,282 Z",
-  "right-shroud":     "M534,266 Q620,244 704,252 L710,306 Q622,296 540,318 Z",
-  "rear-fender":      "M300,248 Q230,234 152,238 L146,266 Q226,262 296,276 Z",
-  "right-fork-guard": "M766,296 L788,292 L800,398 L778,404 Z",
+// ── On-bike mockup ──────────────────────────────────────────────────────────
+// A photographed CRF with blank white plastics, and the customer's artwork
+// wrapped onto its panels and re-lit by the photo's own shading.
+//
+// This replaced a line drawing of a bike. The drawing had to carry its own
+// silhouettes because a cut panel is a flat unwrap of a curved part, and the
+// same is true here: the traces below are the panel AS SEEN on the bike, not
+// the cut outline. The panel map above stays the authority on what is cut;
+// this is what it will look like once it is on.
+//
+// Panel geometry is a Coons patch — four cubic Beziers round the edge. A flat
+// quad cannot follow a fender, and a polygon mask cannot be nudged once the
+// photo changes; four curves do both.
+const BIKE_PHOTO = { src: 'bike/side.jpg', w: 2688, h: 1504 };
+
+// Traced at half this resolution, so every number here is an even multiple.
+const BIKE_PANELS = {
+  'front-fender': {
+    top:    [[1776,462],[1920,450],[2080,468],[2224,512]],
+    right:  [[2224,512],[2280,536],[2336,560],[2392,584]],
+    bottom: [[1788,520],[1952,526],[2156,552],[2392,584]],
+    left:   [[1776,462],[1780,482],[1784,502],[1788,520]],
+  },
+  'left-shroud': {
+    top:    [[1352,392],[1460,372],[1580,376],[1692,432]],
+    right:  [[1692,432],[1676,512],[1652,592],[1612,676]],
+    bottom: [[1400,600],[1476,660],[1552,688],[1612,676]],
+    left:   [[1352,392],[1368,462],[1384,532],[1400,600]],
+  },
+  'rear-fender': {
+    top:    [[592,428],[764,438],[940,454],[1112,480]],
+    right:  [[1112,480],[1112,564],[1108,648],[1104,728]],
+    bottom: [[752,696],[868,710],[984,720],[1104,728]],
+    left:   [[592,428],[646,518],[700,608],[752,696]],
+  },
 };
 
-function bikeChassis(ns){
-  const frag = document.createDocumentFragment();
-  const add = (tag, attrs, cls) => {
-    const el = document.createElementNS(ns, tag);
-    for(const k in attrs) el.setAttribute(k, attrs[k]);
-    if(cls) el.setAttribute('class', cls);
-    frag.appendChild(el);
-    return el;
-  };
+// Carried by the kit but on the far side of this view, or not distinguishable
+// on this bike. Saying so beats quietly showing five panels out of six.
+const BIKE_PANELS_UNSEEN = {
+  'right-shroud':     'other side',
+  'left-fork-guard':  'not shown',
+  'right-fork-guard': 'other side',
+};
 
-  // 21" front and 18" rear on knobblies. The size difference is most of what
-  // separates a dual-sport silhouette from a pushbike.
-  [[800,428,142],[238,442,126]].forEach(([cx,cy,r])=>{
-    add('circle',{cx,cy,r:r-14},'bike-tyre');
-    add('circle',{cx,cy,r:r-32},'bike-rim');
-    add('circle',{cx,cy,r:r-40},'bike-rim');
-    add('circle',{cx,cy,r:18},'bike-hub');
-    for(let a=0; a<180; a+=22.5){
-      const rad = a*Math.PI/180, rr = r-42;
-      add('line',{x1:cx-rr*Math.cos(rad), y1:cy-rr*Math.sin(rad),
-                  x2:cx+rr*Math.cos(rad), y2:cy+rr*Math.sin(rad)},'bike-spoke');
+let bikeBase = null, bikeCtx = null, mockupPending = false;
+const bikeArt = Object.create(null);   // zoneId -> HTMLImageElement
+
+const clampN = (x, a, b) => x < a ? a : x > b ? b : x;
+
+function bez(p, t){
+  const u = 1-t, a = u*u*u, b = 3*u*u*t, c = 3*u*t*t, d = t*t*t;
+  return [a*p[0][0] + b*p[1][0] + c*p[2][0] + d*p[3][0],
+          a*p[0][1] + b*p[1][1] + c*p[2][1] + d*p[3][1]];
+}
+function coons(P, u, v){
+  const T = bez(P.top,u), B = bez(P.bottom,u), L = bez(P.left,v), R = bez(P.right,v);
+  const c00=P.top[0], c10=P.top[3], c01=P.bottom[0], c11=P.bottom[3];
+  const mix = (t,b,l,r,a,bb,cc,dd) =>
+    (1-v)*t + v*b + (1-u)*l + u*r
+    - ((1-u)*(1-v)*a + u*(1-v)*bb + (1-u)*v*cc + u*v*dd);
+  return [mix(T[0],B[0],L[0],R[0], c00[0],c10[0],c01[0],c11[0]),
+          mix(T[1],B[1],L[1],R[1], c00[1],c10[1],c01[1],c11[1])];
+}
+
+// Canvas 2D has no perspective transform, so the patch is subdivided and each
+// cell drawn as two affine triangles. Triangles are grown slightly about their
+// centroid; at exact size the seams between cells show as hairlines.
+function drawTri(c, img, s, d){
+  const g = 1.03, cx = (d[0][0]+d[1][0]+d[2][0])/3, cy = (d[0][1]+d[1][1]+d[2][1])/3;
+  const e = d.map(p => [cx + (p[0]-cx)*g, cy + (p[1]-cy)*g]);
+  c.save();
+  c.beginPath(); c.moveTo(e[0][0],e[0][1]); c.lineTo(e[1][0],e[1][1]); c.lineTo(e[2][0],e[2][1]);
+  c.closePath(); c.clip();
+  const [[sx0,sy0],[sx1,sy1],[sx2,sy2]] = s, [[dx0,dy0],[dx1,dy1],[dx2,dy2]] = d;
+  const den = sx0*(sy2-sy1) - sx1*sy2 + sx2*sy1 + (sx1-sx2)*sy0;
+  if(Math.abs(den) > 1e-9){
+    c.transform(
+      -(sy0*(dx2-dx1) - sy1*dx2 + sy2*dx1 + (sy1-sy2)*dx0) / den,
+       (sy1*dy2 + sy0*(dy1-dy2) - sy2*dy1 + (sy2-sy1)*dy0) / den,
+       (sx0*(dx2-dx1) - sx1*dx2 + sx2*dx1 + (sx1-sx2)*dx0) / den,
+      -(sx1*dy2 + sx0*(dy1-dy2) - sx2*dy1 + (sx2-sx1)*dy0) / den,
+       (sx0*(sy2*dx1 - sy1*dx2) + sy0*(sx1*dx2 - sx2*dx1) + (sx2*sy1 - sx1*sy2)*dx0) / den,
+       (sx0*(sy2*dy1 - sy1*dy2) + sy0*(sx1*dy2 - sx2*dy1) + (sx2*sy1 - sx1*sy2)*dy0) / den);
+    c.drawImage(img, 0, 0);
+  }
+  c.restore();
+}
+
+function patchBBox(P){
+  let x0=1e9, y0=1e9, x1=-1e9, y1=-1e9;
+  for(const e of ['top','bottom','left','right'])
+    for(let t=0; t<=1.0001; t+=0.05){
+      const p = bez(P[e], t);
+      x0=Math.min(x0,p[0]); y0=Math.min(y0,p[1]);
+      x1=Math.max(x1,p[0]); y1=Math.max(y1,p[1]);
     }
-  });
-  add('circle',{cx:800,cy:428,r:46},'bike-disc');
-  add('circle',{cx:238,cy:442,r:40},'bike-disc');
-
-  // Swingarm and chain run
-  add('path',{d:'M452,404 L238,442 L238,456 L456,420 Z'},'bike-fill');
-  add('path',{d:'M470,398 L238,428'},'bike-thin');
-  add('path',{d:'M466,424 L240,456'},'bike-thin');
-
-  // Engine: cases, barrel and head as one solid mass slung low and forward
-  add('path',{d:'M448,338 L604,330 L626,392 L612,458 L470,464 L430,404 Z'},'bike-mass');
-  add('path',{d:'M474,296 L586,292 L600,336 L462,342 Z'},'bike-mass');
-  add('path',{d:'M486,268 L566,264 L578,296 L478,300 Z'},'bike-mass');
-  add('path',{d:'M456,452 L616,446 L604,470 L470,474 Z'},'bike-fill');   // sump
-  add('path',{d:'M446,470 Q540,492 626,462 L622,478 Q538,506 444,484 Z'},'bike-fill'); // bash plate
-
-  // Frame: backbone, downtube, cradle, subframe
-  add('path',{d:'M744,232 L588,318'},'bike-tube');
-  add('path',{d:'M588,318 L556,420 L482,466'},'bike-tube');
-  add('path',{d:'M740,244 L520,278'},'bike-tube');
-  add('path',{d:'M520,278 L470,404'},'bike-tube');
-  add('path',{d:'M520,276 L268,262'},'bike-tube');
-  add('path',{d:'M300,268 L452,406'},'bike-thin');
-  add('path',{d:'M500,290 L468,398'},'bike-line');   // shock body
-
-  // Forks: thin uppers into fat lowers, plus the triple clamps
-  add('path',{d:'M756,214 L792,404'},'bike-line');
-  add('path',{d:'M774,212 L810,402'},'bike-line');
-  add('path',{d:'M786,336 L820,334 L830,432 L796,436 Z'},'bike-fill');
-  add('path',{d:'M744,206 L788,198'},'bike-tube');
-  add('path',{d:'M750,232 L794,224'},'bike-tube');
-  add('path',{d:'M736,186 L812,170'},'bike-tube');   // handlebar
-
-  // Tank and the long flat seat
-  add('path',{d:'M548,266 Q636,242 706,258 L712,304 Q632,286 546,304 Z'},'bike-fill');
-  add('path',{d:'M280,242 Q396,230 522,266 L516,292 Q394,256 284,268 Z'},'bike-mass');
-
-  // Exhaust: header off the head, up and back to the tail
-  add('path',{d:'M596,300 Q660,330 612,368 Q470,352 342,296'},'bike-pipe');
-  return frag;
+  return [Math.floor(x0)-2, Math.floor(y0)-2, Math.ceil(x1)+2, Math.ceil(y1)+2];
 }
 
-// Union of the side-view panels, so one image can be laid over the bike the
-// same way it is laid over the cut sheet.
-let bikeUnion = null;
-function bikeBBox(svg){
-  if(bikeUnion) return bikeUnion;
-  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
-  svg.querySelectorAll('.bike-zone > .bike-panel-blank').forEach(p=>{
-    const b=p.getBBox();
-    x0=Math.min(x0,b.x); y0=Math.min(y0,b.y);
-    x1=Math.max(x1,b.x+b.width); y1=Math.max(y1,b.y+b.height);
-  });
-  bikeUnion={x:x0,y:y0,w:x1-x0,h:y1-y0};
-  return bikeUnion;
+// Painting the artwork straight on gives a sticker: flat colour, no form. The
+// panel's own luminance carries its curvature, its highlight and the shadow
+// under the fender lip, so the artwork is multiplied by that and the brightest
+// part of the highlight added back. Only luminance is sampled, never the
+// photo's hue, so the plastic underneath does not tint the design.
+function compositePanel(P, art){
+  const [x0,y0,x1,y1] = patchBBox(P);
+  const w = x1-x0, h = y1-y0;
+  if(w <= 0 || h <= 0) return;
+
+  const off = document.createElement('canvas');
+  off.width = w; off.height = h;
+  const oc = off.getContext('2d', { willReadFrequently: true });
+  oc.translate(-x0, -y0);
+
+  const N = 22, iw = art.naturalWidth || art.width, ih = art.naturalHeight || art.height;
+  for(let j=0; j<N; j++){
+    for(let i=0; i<N; i++){
+      const u0=i/N, u1=(i+1)/N, v0=j/N, v1=(j+1)/N;
+      const d00=coons(P,u0,v0), d10=coons(P,u1,v0), d01=coons(P,u0,v1), d11=coons(P,u1,v1);
+      const s00=[u0*iw,v0*ih], s10=[u1*iw,v0*ih], s01=[u0*iw,v1*ih], s11=[u1*iw,v1*ih];
+      drawTri(oc, art, [s00,s10,s01], [d00,d10,d01]);
+      drawTri(oc, art, [s10,s11,s01], [d10,d11,d01]);
+    }
+  }
+
+  // getImageData/putImageData work in device pixels and ignore the transform
+  // set above, so the offscreen is addressed from its own origin here.
+  const A = oc.getImageData(0,0,w,h);
+  const B = bikeCtx.getImageData(x0,y0,w,h);
+  const a = A.data, b = B.data;
+
+  // Pivot on the panel's own median brightness, so a dark panel is not crushed
+  // and a bright one is not blown out.
+  const lum = [];
+  for(let k=0; k<a.length; k+=4){
+    if(a[k+3] < 8) continue;
+    lum.push(0.2126*b[k] + 0.7152*b[k+1] + 0.0722*b[k+2]);
+  }
+  if(!lum.length) return;
+  lum.sort((p,q) => p-q);
+  const pivot = Math.max(28, lum[lum.length >> 1]);
+
+  const CONTRAST = 0.78;
+  for(let k=0; k<a.length; k+=4){
+    if(a[k+3] < 8) continue;
+    const L = (0.2126*b[k] + 0.7152*b[k+1] + 0.0722*b[k+2]) / pivot;
+    const s = clampN(1 + (L-1)*CONTRAST, 0.30, 1.85);
+    const spec = s > 1.24 ? (s-1.24)*190 : 0;
+    a[k]   = clampN(a[k]  *s + spec, 0, 255);
+    a[k+1] = clampN(a[k+1]*s + spec, 0, 255);
+    a[k+2] = clampN(a[k+2]*s + spec, 0, 255);
+  }
+  oc.putImageData(A, 0, 0);
+  bikeCtx.drawImage(off, x0, y0);
 }
 
-function buildBikePreview(){
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.getElementById('bike-svg');
-  svg.innerHTML = '';
-  bikeUnion = null;
-  const defs = document.createElementNS(ns,'defs');
-  svg.appendChild(defs);
-  svg.appendChild(bikeChassis(ns));
-
-  Object.keys(BIKE_SIDE).forEach(zoneId=>{
-    const d = BIKE_SIDE[zoneId];
-    const g = document.createElementNS(ns,'g');
-    g.setAttribute('class','bike-zone');
-    g.setAttribute('data-zone', zoneId);
-    g.style.cursor = 'pointer';
-    g.addEventListener('click', ()=> selectZone(zoneId));
-
-    const clip = document.createElementNS(ns,'clipPath');
-    clip.setAttribute('id','bike-clip-'+zoneId);
-    clip.setAttribute('clipPathUnits','userSpaceOnUse');
-    const cp = document.createElementNS(ns,'path');
-    cp.setAttribute('d', d);
-    clip.appendChild(cp);
-    defs.appendChild(clip);
-
-    const blank = document.createElementNS(ns,'path');
-    blank.setAttribute('d', d);
-    blank.setAttribute('class','bike-panel-blank');
-    g.appendChild(blank);
-
-    const art = document.createElementNS(ns,'g');
-    art.setAttribute('class','bike-art');
-    art.setAttribute('clip-path','url(#bike-clip-'+zoneId+')');
-    g.appendChild(art);
-
-    const edge = document.createElementNS(ns,'path');
-    edge.setAttribute('d', d);
-    edge.setAttribute('class','bike-panel-edge');
-    g.appendChild(edge);
-
-    svg.appendChild(g);
-  });
+function renderMockup(){
+  if(!bikeBase) return;
+  const cv = document.getElementById('bike-canvas');
+  cv.width = BIKE_PHOTO.w; cv.height = BIKE_PHOTO.h;
+  bikeCtx = cv.getContext('2d', { willReadFrequently: true });
+  bikeCtx.drawImage(bikeBase, 0, 0, BIKE_PHOTO.w, BIKE_PHOTO.h);
+  for(const zoneId in BIKE_PANELS){
+    const art = bikeArt[zoneId];
+    if(art && art.complete && art.naturalWidth) compositePanel(BIKE_PANELS[zoneId], art);
+  }
+  refreshMockupNote();
 }
 
-function updateBikeZone(zoneId){
-  const g = document.querySelector('.bike-zone[data-zone="'+zoneId+'"]');
-  if(!g) return;
-  const art = g.querySelector('.bike-art');
-  art.innerHTML = '';
+// Compositing walks a 22x22 mesh per panel and reads pixels back, so it is far
+// too heavy to run on every drag frame. Coalesce to one render per animation
+// frame and let the SVG map carry the live feedback while a panel is moving.
+function scheduleMockup(){
+  if(mockupPending) return;
+  mockupPending = true;
+  requestAnimationFrame(() => { mockupPending = false; renderMockup(); });
+}
+
+// The design is held as a data URL; decoding it is async, so the render is
+// scheduled again once the bitmap is actually usable.
+function syncMockupArt(zoneId){
   const design = state.designs[zoneId];
-  if(!design) return;
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.getElementById('bike-svg');
-  const u = bikeBBox(svg);
-  // Cover the whole bike with the image, so the artwork reads as one design
-  // running across the panels rather than four separate crops.
-  const sc = Math.max(u.w/design.natW, u.h/design.natH);
-  const grp = document.createElementNS(ns,'g');
-  grp.setAttribute('transform',
-    `translate(${u.x+u.w/2},${u.y+u.h/2}) scale(${sc}) translate(${-design.natW/2},${-design.natH/2})`);
-  const img = document.createElementNS(ns,'image');
-  img.setAttribute('x',0); img.setAttribute('y',0);
-  img.setAttribute('width', design.natW);
-  img.setAttribute('height', design.natH);
-  img.setAttribute('href', design.img);
-  img.setAttributeNS('http://www.w3.org/1999/xlink','href', design.img);
-  grp.appendChild(img);
-  art.appendChild(grp);
+  if(!design){ delete bikeArt[zoneId]; scheduleMockup(); return; }
+  const cur = bikeArt[zoneId];
+  if(cur && cur.src === design.img){ scheduleMockup(); return; }
+  const img = new Image();
+  img.onload = scheduleMockup;
+  img.src = design.img;
+  bikeArt[zoneId] = img;
+}
+
+function refreshMockupNote(){
+  const note = document.getElementById('bike-note');
+  if(!note) return;
+  const missing = Object.keys(BIKE_PANELS_UNSEEN)
+    .filter(id => state.designs[id])
+    .map(id => zoneLabel(id) + ' (' + BIKE_PANELS_UNSEEN[id] + ')');
+  note.textContent = missing.length
+    ? 'Also in your kit, but not visible from this angle: ' + missing.join(', ') + '.'
+    : '';
+}
+
+function initMockup(){
+  const img = new Image();
+  img.onload = () => { bikeBase = img; ZONES.forEach(z => syncMockupArt(z.id)); renderMockup(); };
+  img.src = BIKE_PHOTO.src;
 }
 
 function buildZoneList(){
@@ -1334,42 +1373,122 @@ function refreshOrderState(){
   }
 }
 
-// Builds a real, standalone SVG of the kit as currently designed, using the
-// same nodes driving the live preview, so the file always matches what was shown.
+// Builds the print-and-cut file a vinyl printer actually needs: artwork at true
+// size with a 3 mm bleed, a cut path per panel on its own CutContour layer, a
+// weed border and registration marks.
+//
+// Built from the panel geometry and the placed designs, NOT by cloning the
+// on-screen map. The map paints panel fills and outlines to make itself
+// readable; cloning it shipped that grey chrome into the file, so a printer
+// received artwork sitting on grey rectangles with nothing to cut to.
 function buildExportSVG(orderId){
-  const src = document.getElementById('overview-svg');
-  const clone = src.cloneNode(true);
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-  // real-world size, taken from the source template's own measurement note
-  clone.setAttribute('width', '237.688cm');
-  clone.setAttribute('height', '145.918cm');
-  const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
-  bg.setAttribute('x', VB_X); bg.setAttribute('y', VB_Y);
-  bg.setAttribute('width', VB_W); bg.setAttribute('height', VB_H);
-  bg.setAttribute('fill', '#ffffff');
-  clone.insertBefore(bg, clone.firstChild);
+  const ns = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs) => {
+    const n = document.createElementNS(ns, tag);
+    for(const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
 
-  // The live page's colours come from an external stylesheet, which a
-  // downloaded standalone file doesn't carry with it. Bake the same
-  // colours in as inline attributes so the file looks right on its own —
-  // most importantly, the outline layer must be explicitly fill:none or
-  // it defaults to a solid black fill that blacks out the artwork underneath.
-  clone.querySelectorAll('.zone-shape').forEach(p=>{
-    p.setAttribute('fill', '#3a3d44');
-    p.setAttribute('stroke', '#54585f');
-    p.setAttribute('stroke-width', '260');
+  const svg = el('svg', {
+    xmlns: ns, 'xmlns:xlink': 'http://www.w3.org/1999/xlink',
+    viewBox: VIEWBOX, width: SHEET_W_CM + 'cm', height: SHEET_H_CM + 'cm',
   });
-  clone.querySelectorAll('.zone-edge').forEach(p=>{
-    p.setAttribute('fill', 'none');
-    p.setAttribute('stroke', '#8a8f97');
-    p.setAttribute('stroke-width', '220');
-  });
+  const title = el('title', {});
+  title.textContent = 'CRF250L kit — order ' + orderId;
+  svg.appendChild(title);
 
-  const title = document.createElementNS('http://www.w3.org/2000/svg','title');
-  title.textContent = 'CRF250L kit \u2014 order ' + orderId;
-  clone.insertBefore(title, clone.firstChild);
-  return new XMLSerializer().serializeToString(clone);
+  const defs = el('defs', {});
+  svg.appendChild(defs);
+
+  // Only panels the customer actually designed. An untouched panel was not
+  // bought, so it is neither printed nor cut.
+  const placed = ZONES.filter(z => state.designs[z.id]);
+
+  // Vinyl prints on white stock. A transparent background reads as "no ink"
+  // to some RIPs and as black to others, so say which it is.
+  svg.appendChild(el('rect', {x:VB_X, y:VB_Y, width:VB_W, height:VB_H, fill:'#ffffff'}));
+
+  // -- printed layer ---------------------------------------------------
+  const art = el('g', {id:'Artwork'});
+  placed.forEach(z => {
+    const d = state.designs[z.id], bb = state.zoneBBox[z.id];
+
+    // A mask, not a clipPath: clipping uses fill geometry only and ignores
+    // stroke, and the stroke is what grows the panel by the bleed. Filled and
+    // stroked white gives the panel outline plus BLEED_MM on every side.
+    // Bound it to the panel, not the sheet — a sheet-sized mask makes a
+    // renderer allocate a 2.4 m buffer per panel, which is enough to run some
+    // of them out of memory before the file ever reaches a RIP.
+    const pad = 2 * BLEED_MM * UPMM;
+    const mask = el('mask', {id:'bleed-'+z.id, maskUnits:'userSpaceOnUse',
+                             x:bb.x-pad, y:bb.y-pad,
+                             width:bb.w+2*pad, height:bb.h+2*pad});
+    pathsFor(z).forEach(dd => mask.appendChild(el('path', {
+      d: dd, fill:'#ffffff', stroke:'#ffffff',
+      'stroke-width': (2 * BLEED_MM * UPMM).toFixed(2),
+      'stroke-linejoin':'round',
+    })));
+    defs.appendChild(mask);
+
+    const cx = bb.x + bb.w/2, cy = bb.y + bb.h/2;
+    const s = d.baseScale * d.scaleMult;
+    const holder = el('g', {mask:'url(#bleed-'+z.id+')'});
+    const imgGrp = el('g', {transform:
+      `translate(${d.panX},${d.panY}) translate(${cx},${cy}) rotate(${d.rot}) `
+      + `scale(${s}) translate(${-d.natW/2},${-d.natH/2})`});
+    const img = el('image', {x:0, y:0, width:d.natW, height:d.natH});
+    img.setAttribute('href', d.img);
+    img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', d.img);
+    imgGrp.appendChild(img);
+    holder.appendChild(imgGrp);
+    art.appendChild(holder);
+  });
+  svg.appendChild(art);
+
+  // -- cut layer -------------------------------------------------------
+  // Named CutContour and stroked 100% magenta, the convention VersaWorks,
+  // Onyx, Caldera and Flexi all read as "cut this, do not print it". SVG has
+  // no spot colours, so a printer may still map the name once on import; the
+  // layer name and the magenta are the hooks that let them.
+  const cut = el('g', {id:'CutContour', fill:'none', stroke:CUT_COLOUR,
+                       'stroke-width': (0.25 * UPMM).toFixed(2)});
+  const cutTitle = el('title', {});
+  cutTitle.textContent = 'CutContour';
+  cut.appendChild(cutTitle);
+  placed.forEach(z => pathsFor(z).forEach(dd => cut.appendChild(el('path', {d:dd}))));
+
+  // Weed border, so the waste vinyl lifts off the backing in one piece instead
+  // of being picked out around every panel. Only when it actually fits inside
+  // the media: a full kit fills the sheet, and a border drawn round that lands
+  // off the media entirely, which is a cut the plotter cannot make.
+  if(placed.length){
+    let x0=Infinity, y0=Infinity, x1=-Infinity, y1=-Infinity;
+    placed.forEach(z => {
+      const b = state.zoneBBox[z.id];
+      x0=Math.min(x0,b.x); y0=Math.min(y0,b.y);
+      x1=Math.max(x1,b.x+b.w); y1=Math.max(y1,b.y+b.h);
+    });
+    const m = 12 * UPMM, edge = 5 * UPMM;
+    const bx = x0-m, by = y0-m, bw = (x1-x0)+2*m, bh = (y1-y0)+2*m;
+    if(bx >= VB_X+edge && by >= VB_Y+edge
+       && bx+bw <= VB_X+VB_W-edge && by+bh <= VB_Y+VB_H-edge){
+      cut.appendChild(el('rect', {x:bx, y:by, width:bw, height:bh}));
+    }
+  }
+  svg.appendChild(cut);
+
+  // -- registration marks ----------------------------------------------
+  // Marks at the media corners, 10 mm in. Mark geometry is machine specific,
+  // so a printer will often drop these for their own; keeping them on their
+  // own layer makes that one delete rather than a hunt.
+  const reg = el('g', {id:'RegistrationMarks', fill:'#000000'});
+  const r = 2.5 * UPMM, inset = 10 * UPMM;
+  [[VB_X+inset, VB_Y+inset], [VB_X+VB_W-inset, VB_Y+inset],
+   [VB_X+inset, VB_Y+VB_H-inset], [VB_X+VB_W-inset, VB_Y+VB_H-inset]]
+    .forEach(([cx,cy]) => reg.appendChild(el('circle', {cx, cy, r})));
+  svg.appendChild(reg);
+
+  return new XMLSerializer().serializeToString(svg);
 }
 
 function triggerDownload(filename, content, mime){
@@ -1518,7 +1637,7 @@ async function submitOrder(){
 document.getElementById('submit-btn').addEventListener('click', submitOrder);
 
 buildOverview();
-buildBikePreview();
+initMockup();
 buildPresetRow();
 document.getElementById('kitwide-btn').addEventListener('click', ()=>{
   const inp = document.createElement('input');
