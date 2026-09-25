@@ -122,7 +122,7 @@
       <h1>CRF ECU Template Builder</h1>
       <p>Build your base file for the Honda CRF250L / CRF250 Rally / CRF300L / CRF300 Rally.
          For naturally aspirated engines running 91&ndash;95 octane with an aftermarket intake and full exhaust.
-         Load the downloaded JSON into your standalone ECU software (aRacer, etc.) or hand it to your tuner.</p>
+         Fuel corrections and feature configuration. It sets no absolute ignition timing &mdash; your ECU's own spark stands. Load the JSON into your standalone ECU software (aRacer, etc.) or hand it to your tuner.</p>
     </header>
 
     <div class="grid">
@@ -180,7 +180,8 @@
             <div class="field" style="margin: 10px 0 0;">
               <label style="font-size:12px;">Bounce RPM: <span class="slider-val" id="bounceRpmVal">9500</span></label>
               <input type="range" id="bounceRpm" min="8000" max="10200" step="100" value="9500">
-              <div class="hint">Stays below the 10,500 hard limiter, which is fuel cut and is there to protect the engine. This one never replaces it.</div>
+              <div class="hint" id="bounceCeiling"></div>
+              <div class="hint">Stays below the hard limiter, which is fuel cut and is there to protect the engine. This one never replaces it.</div>
             </div>
             <div class="field" style="margin: 10px 0 0;">
               <label for="bounceCut" style="font-size:12px;">Cut type</label>
@@ -202,17 +203,19 @@
 
     <div class="disclaimer">
       <strong>Read before flashing.</strong> This is a base file intended for motorcycles with a
-      free-flowing aftermarket exhaust and intake. This base map has been run on a dyno, so the
-      numbers are not guesses &mdash; but that was our bike, not yours. Altitude, fuel, wear and your
+      free-flowing aftermarket exhaust and intake. The fuel corrections were run on a dyno, so
+      they are not guesses &mdash; but that was our bike, not yours. Altitude, fuel, wear and your
       exact exhaust all move the mixture, so verify AFR with a wideband on your own machine before
-      extended use. Running the decel-flame map or an ignition-cut bounce limiter on a factory
+      extended use. This file sets no absolute ignition timing: spark on these engines is
+      knock-limited on pump gas, and a timing table written for one bike is the fastest way to
+      hole someone else's piston. Your ECU's own spark stands. Running the decel-flame map or an ignition-cut bounce limiter on a factory
       exhaust with a catalytic converter will destroy the converter. Sitting on an ignition-cut
       limiter puts raw fuel and a lot of heat through the exhaust valves and header &mdash; it is a
       party trick, not a way to ride. Emissions-related modifications may be restricted to
       closed-course / off-road use in your jurisdiction &mdash; know your local law.
       <label>
         <input type="checkbox" id="agree">
-        I understand this is a dyno-tested base file rather than a tune for my bike, I will verify AFR before extended use, and I accept responsibility for legal compliance.
+        I understand this is a dyno-tested set of fuel corrections rather than a tune for my bike, that it sets no ignition timing, I will verify AFR before extended use, and I accept responsibility for legal compliance.
       </label>
     </div>
 
@@ -234,7 +237,38 @@
     // Every file carries a version and a short id derived from the settings that
     // produced it. Without them, two files for one bike are indistinguishable
     // and "the map you sent me" is an unanswerable support question.
-    const TEMPLATE_VERSION = "1.1.0";
+    const TEMPLATE_VERSION = "2.0.0";
+
+    // The 250 and the 300 are not the same engine. Same 76 mm bore, but the 300
+    // has 8 mm more stroke, so at a given rpm its piston is moving 14% faster.
+    // Shipping one rev limit to both was the single worst thing in this file.
+    //
+    // The 250's 10,500 figure is Honda's. The 300's is derived, not measured:
+    // the rpm at which its longer stroke reaches the SAME mean piston speed the
+    // 250 sees at its factory limiter. Rounded down to the nearest 50. The
+    // arithmetic is emitted in the file so a tuner can check it rather than
+    // trust it, and Honda's own figure should replace it the moment we have one.
+    const MODELS = {
+      "Honda CRF250L":      { cc: 249, bore_mm: 76, stroke_mm: 55, limiter_rpm: 10500, limiter_source: "factory" },
+      "Honda CRF250 Rally": { cc: 249, bore_mm: 76, stroke_mm: 55, limiter_rpm: 10500, limiter_source: "factory" },
+      "Honda CRF300L":      { cc: 286, bore_mm: 76, stroke_mm: 63, limiter_rpm: null,  limiter_source: "derived" },
+      "Honda CRF300 Rally": { cc: 286, bore_mm: 76, stroke_mm: 63, limiter_rpm: null,  limiter_source: "derived" },
+    };
+    const REF = MODELS["Honda CRF250L"];
+    const REF_PISTON_SPEED = 2 * (REF.stroke_mm / 1000) * REF.limiter_rpm / 60;   // 19.25 m/s
+
+    function engine() {
+      const m = MODELS[$("model").value] || REF;
+      const limiter = m.limiter_rpm
+        || Math.floor(REF_PISTON_SPEED * 60 / (2 * (m.stroke_mm / 1000)) / 50) * 50;
+      return Object.assign({}, m, {
+        limiter_rpm: limiter,
+        // The soft limiter is something you sit on deliberately, so it needs real
+        // clearance under the hard one rather than a token margin.
+        bounce_max_rpm: Math.floor((limiter - 300) / 50) * 50,
+        mean_piston_speed_at_limiter_ms: +(2 * (m.stroke_mm / 1000) * limiter / 60).toFixed(2),
+      });
+    }
     function buildId() {
       const parts = [$("model").value, $("launch").checked ? "L" + $("launchRpm").value : "l",
                      $("decel").checked ? "D" : "d",
@@ -251,13 +285,14 @@
       const decelOn = $("decel").checked;
       const bounceOn = $("bounce").checked;
       const bounceCut = $("bounceCut").value;
+      const eng = engine();
       const config = {
         template_version: TEMPLATE_VERSION,
         generated_at: new Date().toISOString(),
         build_id: buildId(),
         build_profile: {
           platform: model,
-          engine: is300 ? "Standard Displacement (286cc)" : "Standard Displacement (250cc)",
+          engine: eng.cc + "cc, " + eng.bore_mm + " x " + eng.stroke_mm + " mm",
           induction: "Naturally Aspirated (Aftermarket Intake & Exhaust)",
           fuel_type: $("fuel").value,
           // The downloaded file has to carry this, not just the page: the file is
@@ -269,13 +304,25 @@
         conventions: {
           note: "Read these before interpreting any number below. Two bikes have been mapped onto one file format, and every timing value here is meaningless without them.",
           timing_units: "Degrees crank angle BEFORE top dead centre (BTDC). A larger number is more advance.",
-          timing_absolute_vs_delta: "base_ignition_map_btdc holds ABSOLUTE BTDC values. Every key ending _delta_degrees is a SIGNED OFFSET applied to that base: negative retards, positive advances.",
+          timing_absolute_vs_delta: "This file sets NO absolute ignition timing. Every key ending _delta_degrees is a SIGNED OFFSET applied to whatever spark your ECU is already running: negative retards, positive advances.",
           fuel_units: "Percent correction applied to the ECU's existing fuel value. Positive is richer."
         },
         safety_parameters: {
           target_afr_cruising: [13.2, 13.5],
           target_afr_wot: [12.8, 13.1],
-          rev_limiter_rpm: 10500
+          rev_limiter_rpm: eng.limiter_rpm,
+          rev_limiter_basis: eng.limiter_source === "factory"
+            ? "Honda's figure for this engine."
+            : "DERIVED, not measured: the rpm at which this engine's " + eng.stroke_mm
+              + " mm stroke reaches the same mean piston speed (" + REF_PISTON_SPEED.toFixed(2)
+              + " m/s) that the 55 mm stroke CRF250L sees at its factory " + REF.limiter_rpm
+              + " rpm limiter, rounded down to 50 rpm. Replace it with Honda's figure if you have it.",
+          mean_piston_speed_at_limiter_ms: eng.mean_piston_speed_at_limiter_ms
+        },
+        spark_policy: {
+          sets_absolute_timing: false,
+          note: "This file deliberately does not contain an ignition map. Spark on these engines is knock-limited on pump gas, and an absolute timing table written for one bike on one dyno is the fastest way to hole somebody else's piston. Your ECU's existing spark stands; the only timing here is the small retards under features, and retard is the safe direction.",
+          if_you_want_spark: "Absolute timing belongs in a tune fitted to your bike with a wideband and a knock ear, not in a downloadable base file."
         },
         features: {
           launch_control: launchOn ? {
@@ -312,7 +359,7 @@
               ignition_timing_delta_degrees: -8,
               fuel_enrichment_percent: 12
             } : {}),
-            must_stay_below_rpm: 10500,
+            must_stay_below_rpm: eng.limiter_rpm,
             note: "A soft limiter sat below the hard limiter, for deliberate use. It never replaces rev_limiter_rpm, which is fuel cut and protects the engine."
           } : { status: "disabled" }
         },
@@ -321,12 +368,6 @@
           "2000_rpm": {"0": 0, "20": 2, "40": 4, "60": 5, "80": 6, "100": 8},
           "5000_rpm": {"0": 0, "20": 4, "40": 6, "60": 8, "80": 10, "100": 12},
           "9000_rpm": {"0": 0, "20": 6, "40": 8, "60": 10, "80": 12, "100": 14}
-        },
-        base_ignition_map_btdc: {
-          description: "NA Pump Gas timing map. RPM vs TPS(%)",
-          "2000_rpm": {"0": 15, "20": 18, "40": 20, "60": 22, "80": 24, "100": 26},
-          "5000_rpm": {"0": 25, "20": 28, "40": 30, "60": 32, "80": 33, "100": 34},
-          "9000_rpm": {"0": 28, "20": 30, "40": 32, "60": 34, "80": 36, "100": 37}
         }
       };
       return config;
@@ -340,6 +381,19 @@
     };
 
     function refresh() {
+      const eng = engine();
+
+      // Retune the soft-limiter control to the selected engine, and pull a value
+      // that is now out of range back in rather than silently emitting it.
+      const bounce = $("bounce" + "Rpm");
+      bounce.max = eng.bounce_max_rpm;
+      if (+bounce.value > eng.bounce_max_rpm) bounce.value = eng.bounce_max_rpm;
+      $("bounceCeiling").textContent =
+        "Hard limiter on the " + $("model").value.replace("Honda ", "") + " is "
+        + eng.limiter_rpm.toLocaleString("en-US") + " rpm"
+        + (eng.limiter_source === "derived" ? " (derived from stroke, not Honda's figure)" : "")
+        + ", so this tops out at " + eng.bounce_max_rpm.toLocaleString("en-US") + ".";
+
       $("launchRpmVal").textContent = $("launchRpm").value;
       $("launchRpm").disabled = !$("launch").checked;
       $("bounceRpmVal").textContent = $("bounceRpm").value;
@@ -408,9 +462,10 @@
       $("doneMsg").textContent = "Downloaded " + a.download + " — verify AFR before extended use.";
     }
 
-    ["model", "injector", "fuel", "launch", "decel", "launchRpm", "bounce", "bounceRpm", "bounceCut", "agree", "email"].forEach((id) =>
-      $(id).addEventListener("input", refresh)
-    );
+    ["model", "injector", "fuel", "launch", "decel", "launchRpm", "bounce", "bounceRpm", "bounceCut", "agree", "email"].forEach((id) => {
+      $(id).addEventListener("input", refresh);
+      $(id).addEventListener("change", refresh);
+    });
     $("download").addEventListener("click", download);
     refresh();
   </script>
