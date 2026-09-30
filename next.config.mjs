@@ -12,7 +12,7 @@
 //
 // To cut a page over: build it in the app router, delete its line here, and
 // delete its file from public/. One page at a time, and nothing else moves.
-const STATIC_PAGES = ["apparel", "ecu", "mods", "approve", "desk", "privacy", "terms"];
+const STATIC_PAGES = ["apparel", "ecu", "mods", "approve", "desk", "sprockets", "privacy", "terms"];
 
 const nextConfig = {
   typescript: {
