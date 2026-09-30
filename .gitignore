@@ -25,3 +25,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Fetched by brand/fetch-font.sh; not vendored.
+brand/Oswald-Bold.ttf
