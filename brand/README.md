@@ -129,3 +129,40 @@ frame. Level H survives roughly 30% damage, which is the point on a tank.
 
 When the real domain exists, rebuild with it — the QR is generated, never
 hand-placed, so it is one argument.
+
+## Sliced from the brand sheet
+
+`sheet/` holds the elements cut out of the supplied composite. Every file here
+is lettering, type, a generic device or a landscape — nothing in it belongs to
+anyone else. The character and the Poké Ball on that sheet are Nintendo /
+The Pokémon Company marks and are not in this repository; cropping them
+smaller would not have changed that, and decal kits are the category those
+marks are enforced against hardest.
+
+| File | px | Use |
+|---|---|---|
+| `wordmark-hero.png` | 940x232 | Full lockup with tagline and katakana. Site hero. |
+| `wordmark-white.png` | 454x150 | White on dark. The cleanest of the four. |
+| `wordmark-violet.png` | 466x150 | Violet with drips. Dark backgrounds. |
+| `wordmark-katakana.png` | 358x90 | Wordmark over ストリートスウィーパーカスタムズ. |
+| `crown.png` | 115x156 | Graffiti crown. Pairs above the monogram. |
+| `monogram-ss.png` | 190x149 | Chicano SS. Fork guards, chest prints. |
+| `kanji-sweep.png` | 116x156 | 掃 — sweep. Category tags, fender accents. |
+| `hero-road.png` | 337x243 | Bike at purple hour with the wordmark. |
+| `product-swingarm.png` | 251x243 | Swingarm decal in situ. Proof shot. |
+| `scene-moon.png` | 121x251 | Palms and moon. Story background. |
+| `nameplate.png` | 112x126 | Stacked name over katakana. |
+
+**These are small.** They were cut from a 1536x1024 sheet, so the largest is
+940 px wide. That is enough for the web, a social post and a sticker up to
+about 70 mm. It is not enough for a jersey back, an A2 poster or a full tank
+shroud. Regenerate at size before printing large — do not upscale.
+
+The enso ring on the sheet could not be saved: the character sits on top of
+the brush circle, so any crop that removes one cuts the other. Use
+`kanji-sweep.png` and set a new ring around it.
+
+Taglines, for consistency everywhere:
+
+- BUILT DIFFERENT · SCOUR THE STREETS · CUSTOM EVERYTHING
+- ストリートスウィーパーカスタムズ
