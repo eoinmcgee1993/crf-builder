@@ -25,10 +25,13 @@ from fontTools.pens.svgPathPen import SVGPathPen
 HERE = pathlib.Path(__file__).parent
 TTF = HERE / "Oswald-Bold.ttf"
 GRAFFITI = HERE / "graffiti" / "wordmark-on-black.png"
+PHANTOM  = HERE / "graffiti" / "phantom-on-black.png"
 OUT = HERE / "stickers"
 
 # Brand tokens. See README.md — near-black, never pure black.
-INK, BLACK, RED = "#EEF0F2", "#121316", "#E2231A"
+INK, BLACK = "#EEF0F2", "#121316"
+ACCENT = "#F43F5E"        # Rose 500. 5.42:1 on black; the night palette's sweep.
+VIOLET = "#A855F7"        # Purple 500. 5.03:1 — the only violet that carries type.
 PANEL = "#F6F4EF"          # warm off-white behind the QR; pure white glares
 CUT = "#FF00FF"            # 100% magenta, the CutContour convention
 
@@ -147,7 +150,7 @@ def build(url, captions, name):
     sy = iy + img_h + 2.6
     sweep = ('<path d="M%.2f %.2f L%.2f %.2f L%.2f %.2f L%.2f %.2f Z" fill="%s"/>'
              % (ix, sy + 1.5, ix + col_w, sy, ix + col_w, sy + 1.1,
-                ix, sy + 2.6, RED))
+                ix, sy + 2.6, ACCENT))
 
     lines, y = [], sy + 2.6 + 4.2 + cap_size
     for i, line in enumerate(captions):
@@ -201,7 +204,7 @@ TARGETS = [
     # (url, the two caption lines, filename)
     ("https://crf-garage.netlify.app",
      ["GRAPHICS · RACEWEAR · ECU TUNE", "CRF250L / CRF300L"],
-     "sticker-garage.svg"),
+     "sticker-customs.svg"),
 ]
 
 if __name__ == "__main__":
