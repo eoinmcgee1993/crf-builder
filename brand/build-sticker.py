@@ -202,8 +202,11 @@ def verify(svg, url):
 
 TARGETS = [
     # (url, the two caption lines, filename)
-    ("https://crf-garage.netlify.app",
-     ["GRAPHICS · RACEWEAR · ECU TUNE", "CRF250L / CRF300L"],
+    # crf-garage.netlify.app is DEAD — the Netlify project was renamed to crf81
+    # and the old subdomain now serves Netlify's own 404. Any sticker already
+    # printed with it points at nothing.
+    ("https://crf81.netlify.app",
+     ["DESIGN IT · PRINT IT · PEEL IT", "CRF250L / CRF300L"],
      "sticker-customs.svg"),
 ]
 

@@ -162,7 +162,34 @@ The enso ring on the sheet could not be saved: the character sits on top of
 the brush circle, so any crop that removes one cuts the other. Use
 `kanji-sweep.png` and set a new ring around it.
 
-Taglines, for consistency everywhere:
+The supplied sheet's taglines are not used. See **Voice** below.
 
-- BUILT DIFFERENT · SCOUR THE STREETS · CUSTOM EVERYTHING
-- ストリートスウィーパーカスタムズ
+## Voice
+
+**Primary line**
+
+> SLOW EVERYWHERE. STUCK NOWHERE.
+
+It is true of a CRF250L, a rider nods at it, and no other brand can take it —
+it only works for a dual-sport. The old line, BUILT DIFFERENT, is the most
+worn phrase in the category; SCOUR THE STREETS reads like oven cleaner and
+repeats a word already in the name.
+
+**Three-beat strip** — replaces the old strip under the wordmark. Describes
+what actually happens rather than how it feels.
+
+> DESIGN IT · PRINT IT · PEEL IT
+
+**Commercial sub-line** — for the storefront and the card.
+
+> Cut files you actually own.
+
+**Japanese** — ストリートスウィーパーカスタムズ stays. It is the name
+transliterated, not a slogan, so there is nothing in it to go stale.
+
+Rules:
+
+- One line per surface. The primary and the strip never appear together.
+- Never claim speed. The bike is not fast and the buyer knows it; the appeal
+  is that it goes everywhere, and pretending otherwise loses the room.
+- Say what the buyer gets, not how the brand feels about itself.
