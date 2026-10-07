@@ -202,10 +202,13 @@ def verify(svg, url):
 
 TARGETS = [
     # (url, the two caption lines, filename)
-    # crf-garage.netlify.app is DEAD — the Netlify project was renamed to crf81
-    # and the old subdomain now serves Netlify's own 404. Any sticker already
-    # printed with it points at nothing.
-    ("https://crf81.netlify.app",
+    # Production is Vercel, deploying on push to main; see
+    # docs/crf/DEPLOYMENT.md Phase 3. crf-garage.netlify.app is gone on
+    # purpose — its 404 is what took the placeholder privacy policy off the
+    # internet. DO NOT PRINT this card until the real domain exists: the
+    # vercel.app host is auto-generated and will change, and a QR is the one
+    # thing you cannot correct after it is on a sticker.
+    ("https://crf-eoins-projects-99ff5888.vercel.app",
      ["DESIGN IT · PRINT IT · PEEL IT", "CRF250L / CRF300L"],
      "sticker-customs.svg"),
 ]
