@@ -1496,10 +1496,16 @@ async function applyKitwideImage(rawDataUrl, mode){
 // Ready-made kit designs. Same path as an upload: the image is laid across
 // every panel at once, then any panel can be nudged on its own.
 const PRESETS = [
-  {id:"race",     label:"Race",     file:"kits/race.jpg"},
-  {id:"rally",    label:"Rally",    file:"kits/rally.jpg"},
-  {id:"retro",    label:"Retro",    file:"kits/retro.jpg"},
-  {id:"splatter", label:"Splatter", file:"kits/splatter.jpg"},
+  {id:"race",       label:"Race",       file:"kits/race.jpg"},
+  {id:"rally",      label:"Rally",      file:"kits/rally.jpg"},
+  {id:"retro",      label:"Retro",      file:"kits/retro.jpg"},
+  {id:"splatter",   label:"Splatter",   file:"kits/splatter.jpg"},
+  // Ghost flame: electric crackle over matte black, in the brand's own
+  // Stealth Black and Haunted Purple. Grown, not drawn — see
+  // brand/build-ghostflame.py.
+  {id:"stormveil",  label:"Stormveil",  file:"kits/stormveil.jpg"},
+  {id:"ghostflame", label:"Ghost Flame",file:"kits/ghostflame.jpg"},
+  {id:"hauntwire",  label:"Hauntwire",  file:"kits/hauntwire.jpg"},
 ];
 
 function buildPresetRow(){
