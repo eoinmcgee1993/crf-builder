@@ -6,6 +6,20 @@
 <title>StreetSweeperCustoms — Sprocket &amp; Gearing Calculator</title>
 <link rel="icon" href="favicon.svg">
 <style>
+    /* Mobile Chrome hides the native number spinners, so a value could only be
+       changed by selecting the text and retyping it — which is what made
+       nudging a tooth count or a link count feel impossible on a phone. */
+    .static-val{ font-weight:600; padding:9px 0 0; }
+    .stepper{ display:flex; align-items:stretch; gap:6px; }
+    .stepper input{ flex:1 1 auto; min-width:0; text-align:center; }
+    .stepper button{
+      flex:0 0 44px; min-height:44px; font-size:20px; line-height:1;
+      border:1px solid var(--line); border-radius:8px; background:var(--panel);
+      color:var(--text); cursor:pointer; -webkit-appearance:none; appearance:none;
+      touch-action:manipulation; user-select:none;
+    }
+    .stepper button:active{ background:var(--accent); color:#111; }
+    .stepper button:disabled{ opacity:.35; cursor:default; }
 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 :root{--bg:#121316;--panel:#1b1d22;--panel-2:#22252b;--line:#2d3037;--text:#eef0f2;
   --text-dim:#9aa0aa;--accent:#e2231a;--accent-2:#ff8a1e;--success:#3ddc84;--radius:10px;}
@@ -110,17 +124,16 @@ footer{margin-top:30px;font-size:11px;color:var(--text-dim);text-align:center;li
         <div class="row">
           <div class="field">
             <label for="links0">Current chain length (links)</label>
-            <input id="links0" type="number" min="90" max="140" step="1" value="112">
+            <input id="links0" type="number" min="96" max="136" step="1" value="112">
             <div class="hint" style="margin:5px 0 0;">Count them, or read the chain's own marking. This
               is what makes the new chain length exact rather than a guess.</div>
           </div>
           <div class="field">
-            <label for="pitch">Chain pitch</label>
-            <select id="pitch">
-              <option value="12.700">#420 &mdash; 1/2 in</option>
-              <option value="12.700">#428 &mdash; 1/2 in</option>
-              <option value="15.875" selected>#520 / #525 / #530 &mdash; 5/8 in</option>
-            </select>
+            <label>Chain pitch</label>
+            <div class="static-val">#520 &mdash; 15.875 mm</div>
+            <div class="hint" style="margin:5px 0 0;">Every CRF250L, CRF300L and Rally runs #520.
+              It is not a choice, so it is not a dropdown &mdash; and a wrong pitch here would
+              quietly spoil every chain number below.</div>
           </div>
         </div>
 
@@ -244,13 +257,16 @@ const $ = (id) => document.getElementById(id);
 // absent: Honda does not publish them for these models, and inventing them
 // would put a wrong number in front of someone about to cut a chain.
 const MODELS = {
-  "250L": { f:14, r:40, links:110, pitch:15.875, tw:120, ta:80, tr:18 },
-  "250R": { f:14, r:40, links:110, pitch:15.875, tw:120, ta:80, tr:18 },
-  "300L": { f:14, r:40, links:112, pitch:15.875, tw:120, ta:80, tr:18 },
-  "300R": { f:14, r:40, links:112, pitch:15.875, tw:120, ta:80, tr:18 },
+  "250L": { f:14, r:40, links:110, tw:120, ta:80, tr:18 },
+  "250R": { f:14, r:40, links:110, tw:120, ta:80, tr:18 },
+  "300L": { f:14, r:40, links:112, tw:120, ta:80, tr:18 },
+  "300R": { f:14, r:40, links:112, tw:120, ta:80, tr:18 },
 };
 
 const num = (id) => parseFloat($(id).value);
+
+// #520. Fixed, not selectable — see the note beside the field.
+const CHAIN_PITCH = 15.875;
 const pct = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + "%";
 
 // Rear tyre rolling circumference in metres. Geometric diameter from the tyre's
@@ -280,7 +296,7 @@ function chainLinks(C, f, r, p){
 
 function calc(){
   const f0 = num("f0"), r0 = num("r0"), f1 = num("f1"), r1 = num("r1");
-  const p = parseFloat($("pitch").value), links0 = num("links0");
+  const p = CHAIN_PITCH, links0 = num("links0");
   if (![f0,r0,f1,r1,p,links0].every(Number.isFinite)) return;
 
   const g0 = r0 / f0, g1 = r1 / f1;
@@ -312,8 +328,29 @@ function calc(){
       (100 / (1 + dRatio/100)).toFixed(0) + ".";
 
   // Chain
-  const C = centreDistance(links0, f0, r0, p);
-  if (Number.isFinite(C) && C > 0){
+  //
+  // A chain is named for its pitch (#520) and measured in links (110-ish), and
+  // the two numbers look alike enough that "520" gets typed into the links
+  // field. Nothing used to stop it: the solver dutifully returned a 3868 mm
+  // centre distance — a swingarm roughly seven times the real one — and a
+  // 522-link chain, with no hint that the input was the problem. The range
+  // below is wide enough for any sane re-gear on this bike and narrow enough
+  // to catch that.
+  const el = $("links0");
+  const LINKS_MIN = parseFloat(el.min), LINKS_MAX = parseFloat(el.max);
+  const linksOK = Number.isFinite(links0) && links0 >= LINKS_MIN && links0 <= LINKS_MAX;
+  const C = linksOK ? centreDistance(links0, f0, r0, p) : NaN;
+  if (!linksOK){
+    $("o-links").textContent = "—";
+    $("o-links-n").textContent = links0 >= 400 && links0 <= 540
+      ? "That looks like the chain's size, not its length. #520 is the pitch; "
+        + "the length is the number of links — 110 on a 250L, 112 on a 300L. "
+        + "Count them, or read the stamp on the chain."
+      : "Chain length should be between " + LINKS_MIN + " and " + LINKS_MAX
+        + " links. A standard CRF is 110 (250L) or 112 (300L).";
+    $("o-travel").textContent = "—";
+    $("chainAdvice").className = ""; $("chainAdvice").textContent = "";
+  } else if (Number.isFinite(C) && C > 0){
     const exact = chainLinks(C, f1, r1, p);
     const even = Math.ceil(exact / 2) * 2;      // chains come in even links
     $("o-links").textContent = even + " links";
@@ -432,11 +469,47 @@ $("model").addEventListener("change", () => {
   const m = MODELS[$("model").value];
   if (!m) return;
   $("f0").value = m.f; $("r0").value = m.r; $("links0").value = m.links;
-  $("pitch").value = String(m.pitch);
   $("tw").value = m.tw; $("ta").value = m.ta; $("tr").value = m.tr;
   calc();
 });
-["f0","r0","f1","r1","links0","pitch","tw","ta","tr","squat","calSpeed","calRpm"]
+// Wrap every number input in a -/+ pair. 44px targets so they work with a
+// thumb, and they read the input's own min/max/step rather than keeping a
+// second copy of those numbers in here.
+function buildSteppers(){
+  document.querySelectorAll('.field input[type=number]').forEach(input => {
+    if (input.parentElement.classList.contains('stepper')) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'stepper';
+    const label = input.previousElementSibling ? input.previousElementSibling.textContent : 'value';
+    input.parentNode.insertBefore(wrap, input);
+
+    const mk = (txt, dir) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = txt;
+      b.setAttribute('aria-label', (dir > 0 ? 'Increase ' : 'Decrease ') + label);
+      b.addEventListener('click', () => {
+        const step = parseFloat(input.step) || 1;
+        const min = input.min === '' ? -Infinity : parseFloat(input.min);
+        const max = input.max === '' ?  Infinity : parseFloat(input.max);
+        const cur = parseFloat(input.value);
+        const base = Number.isFinite(cur) ? cur : (Number.isFinite(min) ? min : 0);
+        const next = Math.min(max, Math.max(min, base + dir * step));
+        // Steps of 0.1 otherwise accumulate float dust into the display.
+        const dp = (String(step).split('.')[1] || '').length;
+        input.value = dp ? next.toFixed(dp) : String(next);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      return b;
+    };
+    wrap.appendChild(mk('\u2212', -1));
+    wrap.appendChild(input);
+    wrap.appendChild(mk('+', 1));
+  });
+}
+buildSteppers();
+
+["f0","r0","f1","r1","links0","tw","ta","tr","squat","calSpeed","calRpm"]
   .forEach(id => { $(id).addEventListener("input", calc); $(id).addEventListener("change", calc); });
 calc();
 </script>

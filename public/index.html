@@ -664,7 +664,9 @@ const BIKE_PANELS_UNSEEN = {
 };
 
 let bikeBase = null, bikeCtx = null, mockupPending = false;
-const bikeArt = Object.create(null);   // zoneId -> HTMLImageElement
+const bikeArt = Object.create(null);    // zoneId -> HTMLCanvasElement, artwork AS PLACED
+const bikeSrc = Object.create(null);    // zoneId -> HTMLImageElement, the raw decoded upload
+const bikeKey = Object.create(null);    // zoneId -> placement fingerprint, to avoid rebuilding
 
 const clampN = (x, a, b) => x < a ? a : x > b ? b : x;
 
@@ -783,7 +785,7 @@ function renderMockup(){
   bikeCtx.drawImage(bikeBase, 0, 0, BIKE_PHOTO.w, BIKE_PHOTO.h);
   for(const zoneId in BIKE_PANELS){
     const art = bikeArt[zoneId];
-    if(art && art.complete && art.naturalWidth) compositePanel(BIKE_PANELS[zoneId], art);
+    if(art && art.width && art.height) compositePanel(BIKE_PANELS[zoneId], art);
   }
   refreshMockupNote();
 }
@@ -797,17 +799,81 @@ function scheduleMockup(){
   requestAnimationFrame(() => { mockupPending = false; renderMockup(); });
 }
 
+// Render a panel's artwork AS PLACED into a canvas the shape of that panel's
+// bounding box in cut-map space.
+//
+// compositePanel maps its source 0..1 across the Coons patch, so whatever it
+// is handed is stretched edge-to-edge over the panel. Handing it the raw
+// upload therefore drew the entire picture on every panel, ignoring
+// baseScale, scaleMult, panX, panY and rot completely — which is why one
+// design laid across the kit came out as six separate stickers, each a
+// shrunken copy of the whole image. The cut map above was right the whole
+// time; only the bike view was lying.
+//
+// The transform below is the same one updateOverviewZone and
+// applyImageTransform apply to the SVG, rewritten for canvas: the canvas IS
+// the panel bbox, so the bbox origin moves to 0,0 and everything else follows
+// in the same order.
+function panelArtCanvas(zoneId, bitmap){
+  const design = state.designs[zoneId];
+  const bbox = state.zoneBBox[zoneId];
+  const P = BIKE_PANELS[zoneId];
+  if(!design || !bbox || !P || !bbox.w || !bbox.h) return null;
+
+  // Match the panel's size on the photo, so the mesh is not resampling a
+  // canvas coarser than the pixels it lands on.
+  const [tx0, ty0, tx1, ty1] = patchBBox(P);
+  const target = Math.max(64, Math.min(1600, Math.max(tx1-tx0, ty1-ty0)));
+  const k = target / Math.max(bbox.w, bbox.h);
+  const cw = Math.max(1, Math.round(bbox.w * k));
+  const ch = Math.max(1, Math.round(bbox.h * k));
+
+  const cv = document.createElement('canvas');
+  cv.width = cw; cv.height = ch;
+  const c = cv.getContext('2d');
+  c.scale(k, k);
+  c.translate(-bbox.x, -bbox.y);
+  c.translate(design.panX, design.panY);
+  c.translate(bbox.x + bbox.w/2, bbox.y + bbox.h/2);
+  c.rotate(design.rot * Math.PI / 180);
+  const s = design.baseScale * design.scaleMult;
+  c.scale(s, s);
+  c.drawImage(bitmap, -design.natW/2, -design.natH/2, design.natW, design.natH);
+  return cv;
+}
+
 // The design is held as a data URL; decoding it is async, so the render is
 // scheduled again once the bitmap is actually usable.
 function syncMockupArt(zoneId){
   const design = state.designs[zoneId];
-  if(!design){ delete bikeArt[zoneId]; scheduleMockup(); return; }
-  const cur = bikeArt[zoneId];
-  if(cur && cur.src === design.img){ scheduleMockup(); return; }
+  if(!design){
+    delete bikeArt[zoneId]; delete bikeSrc[zoneId]; delete bikeKey[zoneId];
+    scheduleMockup(); return;
+  }
+  if(!BIKE_PANELS[zoneId]){ scheduleMockup(); return; }  // not visible from this angle
+
+  // Placement is part of the identity: a drag changes the canvas even though
+  // the source image has not moved.
+  const key = [design.img.length, design.baseScale, design.scaleMult,
+               design.panX, design.panY, design.rot, design.img.slice(-24)].join('|');
+  if(bikeKey[zoneId] === key){ scheduleMockup(); return; }
+
+  const cur = bikeSrc[zoneId];
+  if(cur && cur.src === design.img && cur.complete && cur.naturalWidth){
+    bikeKey[zoneId] = key;
+    bikeArt[zoneId] = panelArtCanvas(zoneId, cur);
+    scheduleMockup();
+    return;
+  }
   const img = new Image();
-  img.onload = scheduleMockup;
+  img.onload = () => {
+    if(state.designs[zoneId] !== design) return;   // superseded while decoding
+    bikeKey[zoneId] = key;
+    bikeArt[zoneId] = panelArtCanvas(zoneId, img);
+    scheduleMockup();
+  };
   img.src = design.img;
-  bikeArt[zoneId] = img;
+  bikeSrc[zoneId] = img;
 }
 
 function refreshMockupNote(){
