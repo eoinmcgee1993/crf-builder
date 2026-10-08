@@ -267,7 +267,8 @@ input[type=range]::-webkit-slider-thumb{
 
 .kitwide{border:1px solid var(--line);border-radius:8px;padding:13px 14px;margin:14px 0 4px;background:var(--panel);}
 .kitwide-title{font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-2);font-weight:600;margin-bottom:4px;}
-.kitwide-actions{display:flex;gap:8px;margin-top:11px;}
+.kitwide-actions{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap;}
+.btn-sm.sel{background:var(--accent);color:#111;border-color:var(--accent);}
 .btn-sm.ghost{background:transparent;}
 .printed-shot{margin:12px 0 4px;}
 .printed-shot img{width:100%;border-radius:8px;border:1px solid var(--line);display:block;}
@@ -333,13 +334,17 @@ input[type=range]::-webkit-slider-thumb{
         <div class="kitwide-head">
           <div>
             <div class="kitwide-title">One design across the whole kit</div>
-            <div class="hint">Drop in a single image and it is laid over every panel at once, so the artwork runs continuously across shrouds, tank and fenders the way a real kit does. Adjust any panel afterwards.</div>
+            <div class="hint">Drop in a single image. <strong>On every panel</strong> puts the whole picture on each piece &mdash; what you want for a logo, a character or a photo. <strong>Across the whole kit</strong> stretches one copy over all six so it runs continuously, which suits a repeating pattern. Either way, any panel can be adjusted afterwards.</div>
           </div>
         </div>
         <div class="preset-row" id="preset-row"></div>
         <div class="kitwide-actions">
           <button class="btn-sm" id="kitwide-btn">Upload your own artwork</button>
           <button class="btn-sm ghost" id="kitwide-clear" style="display:none;">Clear all panels</button>
+        </div>
+        <div class="kitwide-actions" id="layout-row" style="display:none;">
+          <button class="btn-sm ghost" id="layout-panel" type="button">On every panel</button>
+          <button class="btn-sm ghost" id="layout-kit" type="button">Across the whole kit</button>
         </div>
         <div class="hint" id="kitwide-msg" style="display:none;"></div>
       </div>
@@ -1197,8 +1202,15 @@ function kitBBox(){
 // placed at the same spot in bike coordinates, so the design carries across the
 // cut lines instead of being repeated six times. Panels stay individually
 // adjustable afterwards.
-async function applyKitwideImage(rawDataUrl){
-  const working = await downscale(rawDataUrl, 1800, 0.87);
+// Spread ONE copy of the image over the whole cut sheet, each panel showing
+// its own window onto it, so the design runs across the cut lines.
+//
+// This is right for a seamless pattern and wrong for anything with a subject.
+// The sheet is around 229000 x 141000 cut units, so a front fender is about
+// 13% of the image wide: a centred logo or character lands entirely outside
+// most panels, and the panels that do catch it get a crop too small to read.
+// That is why layoutOnEveryPanel exists and why an upload defaults to it.
+function layoutAcrossKit(working){
   const u = kitBBox();
   const baseScale = Math.max(u.w/working.w, u.h/working.h);
   const ux = u.x + u.w/2, uy = u.y + u.h/2;
@@ -1207,24 +1219,62 @@ async function applyKitwideImage(rawDataUrl){
     if(!b) return;
     const cx = b.x + b.w/2, cy = b.y + b.h/2;
     state.designs[z.id] = {
-      img: working.url,
-      natW: working.w,
-      natH: working.h,
-      baseScale,
+      img: working.url, natW: working.w, natH: working.h, baseScale,
       // Offset each panel so the shared image sits over the kit as a whole
       // rather than being centred on that panel.
-      panX: ux - cx,
-      panY: uy - cy,
-      rot: 0, scaleMult: 1,
+      panX: ux - cx, panY: uy - cy, rot: 0, scaleMult: 1,
     };
     updateOverviewZone(z.id);
   });
+}
+
+// Put the whole picture on each panel, centred and contained.
+//
+// Contain rather than cover: a motif that is cropped by the panel edge reads
+// as a mistake, and a customer who wants it to bleed can scale it up on that
+// panel. Each panel keeps its own scale, so the image stays as large as that
+// panel allows instead of being held to the smallest one.
+function layoutOnEveryPanel(working){
+  ZONES.forEach(z=>{
+    const b = state.zoneBBox[z.id];
+    if(!b) return;
+    state.designs[z.id] = {
+      img: working.url, natW: working.w, natH: working.h,
+      baseScale: Math.min(b.w/working.w, b.h/working.h),
+      panX: 0, panY: 0, rot: 0, scaleMult: 1,
+    };
+    updateOverviewZone(z.id);
+  });
+}
+
+// The image behind the current layout, so the two buttons can re-lay it
+// without asking for the file again.
+let kitImage = null;
+
+function setKitLayout(mode){
+  if(!kitImage) return;
+  state.kitLayout = mode;
+  if(mode === 'kit') layoutAcrossKit(kitImage); else layoutOnEveryPanel(kitImage);
   if(state.selectedZone) renderWorkspace();
   refreshZoneStatus();
+
+  document.getElementById('layout-row').style.display = '';
+  document.getElementById('layout-panel').classList.toggle('sel', mode === 'panel');
+  document.getElementById('layout-kit').classList.toggle('sel', mode === 'kit');
+
   const msg = document.getElementById('kitwide-msg');
   msg.style.display = 'block';
-  msg.textContent = 'Laid across all ' + ZONES.length + ' panels. Tap any panel to nudge or rescale it on its own.';
+  msg.textContent = mode === 'kit'
+    ? 'One copy stretched across all ' + ZONES.length + ' panels, so it runs over the cut lines. '
+      + 'Best for a repeating pattern. Tap any panel to nudge or rescale it.'
+    : 'The whole image on each of the ' + ZONES.length + ' panels, sized to fit. '
+      + 'Tap any panel to nudge, rescale or rotate it on its own.';
   document.getElementById('kitwide-clear').style.display = '';
+}
+
+async function applyKitwideImage(rawDataUrl, mode){
+  kitImage = await downscale(rawDataUrl, 1800, 0.87);
+  setKitLayout(mode || 'panel');
 }
 
 // Ready-made kit designs. Same path as an upload: the image is laid across
@@ -1265,7 +1315,7 @@ async function applyPreset(p){
       r.onerror = reject;
       r.readAsDataURL(blob);
     });
-    await applyKitwideImage(dataUrl);
+    await applyKitwideImage(dataUrl, 'kit');
     document.querySelectorAll('.preset').forEach(el=> el.classList.remove('sel'));
     document.getElementById('preset-' + p.id).classList.add('sel');
   }catch(err){
@@ -1715,13 +1765,19 @@ document.getElementById('kitwide-btn').addEventListener('click', ()=>{
     const reader = new FileReader();
     reader.onload = (e)=>{
       document.querySelectorAll('.preset').forEach(el=> el.classList.remove('sel'));
-      applyKitwideImage(e.target.result);
+      applyKitwideImage(e.target.result, 'panel');
     };
     reader.readAsDataURL(file);
   });
   inp.click();
 });
-document.getElementById('kitwide-clear').addEventListener('click', clearAllPanels);
+document.getElementById('layout-panel').addEventListener('click', ()=> setKitLayout('panel'));
+document.getElementById('layout-kit').addEventListener('click', ()=> setKitLayout('kit'));
+document.getElementById('kitwide-clear').addEventListener('click', ()=>{
+  kitImage = null;
+  document.getElementById('layout-row').style.display = 'none';
+  clearAllPanels();
+});
 
 buildZoneList();
 refreshZoneStatus();
