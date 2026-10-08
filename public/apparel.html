@@ -134,11 +134,23 @@ input[type=color]{width:44px;height:30px;padding:2px;background:var(--panel-2);
 footer{margin-top:38px;font-size:12px;color:var(--text-dim);text-align:center;}
 .usd{color:var(--text-dim);font-weight:400;font-size:.85em;}
 .warn{border:1px solid var(--accent-2);background:rgba(255,138,30,.07);border-radius:8px;padding:11px 13px;font-size:13px;color:var(--text-dim);margin-top:12px;}
+
+/* The real wordmark, not type set in Oswald. It is the lockup from the brand
+   sheet, so the site, the stickers and the socials carry the same mark. */
+.brandbar{display:block;text-align:center;padding:20px 16px 4px;line-height:0;}
+.brandbar img{height:72px;width:auto;max-width:min(430px,88vw);object-fit:contain;}
+.brandbar .jp{display:block;line-height:1.4;margin-top:9px;font-size:10px;
+  letter-spacing:.28em;color:var(--text-dim);}
+@media(max-width:560px){ .brandbar img{height:56px;} .brandbar .jp{font-size:9px;letter-spacing:.18em;} }
 </style>
 </head>
 <body>
 <div class="wrap">
 
+  <a class="brandbar" href="./index.html" aria-label="StreetSweeperCustoms — home">
+    <img src="brand/wordmark.png" alt="StreetSweeperCustoms" width="454" height="150">
+    <span class="jp">ストリートスウィーパーカスタムズ</span>
+  </a>
   <nav class="site-nav" aria-label="Site sections">
     <a href="./index.html">Graphics Kit Builder</a>
     <a href="./apparel.html" class="is-active" aria-current="page">Racewear Builder</a>
