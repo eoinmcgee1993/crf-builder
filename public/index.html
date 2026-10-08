@@ -339,7 +339,8 @@ input[type=range]::-webkit-slider-thumb{
         </div>
         <div class="preset-row" id="preset-row"></div>
         <div class="kitwide-actions">
-          <button class="btn-sm" id="kitwide-btn">Upload your own artwork</button>
+          <button class="btn-sm" id="kitwide-btn">Upload artwork &mdash; one or several</button>
+          <button class="btn-sm ghost" id="reshuffle" style="display:none;">Reshuffle blend</button>
           <button class="btn-sm ghost" id="kitwide-clear" style="display:none;">Clear all panels</button>
         </div>
         <div class="kitwide-actions" id="layout-row" style="display:none;">
@@ -768,10 +769,30 @@ function compositePanel(P, art){
   lum.sort((p,q) => p-q);
   const pivot = Math.max(28, lum[lum.length >> 1]);
 
+  // A patch is four Beziers traced by hand, so it is a loose quad over a part
+  // that is not one — the shroud's reaches onto the seat at three of its four
+  // corners and the rear fender's runs along the seat for most of its top
+  // edge. Painting the whole quad put artwork on the seat, on the frame and
+  // around the bolts, which is what made a kit read as a square stuck on.
+  //
+  // The bike in this photo wears blank WHITE plastics, so the panel does not
+  // have to be guessed: it is the bright pixels inside the patch. The seat,
+  // the frame, the tyre and the shadow under a lip are all far darker than
+  // the plastic, and they drop out on their own. Soft-edged, so the artwork
+  // dies into the panel edge rather than ending on a jagged line.
+  const bright = lum[Math.min(lum.length-1, Math.floor(lum.length * 0.85))];
+  const MASK_HI = bright * 0.62, MASK_LO = bright * 0.34;
+
   const CONTRAST = 0.78;
   for(let k=0; k<a.length; k+=4){
     if(a[k+3] < 8) continue;
-    const L = (0.2126*b[k] + 0.7152*b[k+1] + 0.0722*b[k+2]) / pivot;
+    const raw = 0.2126*b[k] + 0.7152*b[k+1] + 0.0722*b[k+2];
+    if(raw <= MASK_LO){ a[k+3] = 0; continue; }           // seat, frame, tyre
+    if(raw < MASK_HI){
+      const f = (raw - MASK_LO) / (MASK_HI - MASK_LO);
+      a[k+3] = a[k+3] * f * f * (3 - 2*f);                // smoothstep edge
+    }
+    const L = raw / pivot;
     const s = clampN(1 + (L-1)*CONTRAST, 0.30, 1.85);
     const spec = s > 1.24 ? (s-1.24)*190 : 0;
     a[k]   = clampN(a[k]  *s + spec, 0, 255);
@@ -1202,6 +1223,188 @@ function kitBBox(){
 // placed at the same spot in bike coordinates, so the design carries across the
 // cut lines instead of being repeated six times. Panels stay individually
 // adjustable afterwards.
+// ── Blending several uploads into one kit-wide design ───────────────────────
+//
+// What a customer means by "put these on my bike" is not a collage: it is one
+// piece of artwork that happens to be made of their pictures, running the
+// length of the bike the way a real kit does. Laying the images side by side
+// would read as a contact sheet, so each one is masked with a soft band or
+// bloom and folded into the one below with a blend mode, and sweeps sampled
+// from their own colours are laid over the seams.
+//
+// It is procedural, not generative: no model, no server, no key, and it runs
+// in the browser in a few hundred milliseconds. Everything is driven by a
+// seed, so Reshuffle gives a genuinely different composition from the same
+// pictures and any composition can be reproduced from its number.
+
+// mulberry32 — small, fast, and good enough that successive draws do not
+// visibly correlate, which matters when one seed drives every placement.
+function rng(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function loadImage(src){
+  return new Promise((res, rej)=>{
+    const im = new Image();
+    im.onload = ()=> res(im);
+    im.onerror = rej;
+    im.src = src;
+  });
+}
+
+// A few representative colours, for the sweeps. Sampling a downscaled copy
+// costs one draw instead of walking every pixel of a 1800px upload.
+function sampleColours(img, r){
+  const s = document.createElement('canvas');
+  s.width = 8; s.height = 8;
+  const c = s.getContext('2d', { willReadFrequently: true });
+  c.drawImage(img, 0, 0, 8, 8);
+  const d = c.getImageData(0, 0, 8, 8).data;
+  const out = [];
+  for(let k = 0; k < d.length; k += 4){
+    const mx = Math.max(d[k], d[k+1], d[k+2]), mn = Math.min(d[k], d[k+1], d[k+2]);
+    out.push({ rgb: [d[k], d[k+1], d[k+2]], sat: mx - mn, lum: mx });
+  }
+  // Prefer colour over mud, but keep a bright neutral if that is all there is.
+  out.sort((p, q) => (q.sat * 2 + q.lum) - (p.sat * 2 + p.lum));
+  return out.slice(0, 4).map(o => o.rgb);
+}
+
+// Draw img into a temporary canvas, feather it with a seeded mask, and return
+// the canvas. destination-in keeps only what the gradient paints, which is
+// what turns a rectangle into something with no visible edge.
+function maskedLayer(img, W, H, rand){
+  const lay = document.createElement('canvas');
+  lay.width = W; lay.height = H;
+  const c = lay.getContext('2d');
+
+  // Cover the sheet, then push it around so no two layers sit in register.
+  const cover = Math.max(W / img.width, H / img.height);
+  const s = cover * (0.85 + rand() * 0.75);
+  const ang = (rand() - 0.5) * 0.42;              // about +/- 12 degrees
+  c.save();
+  c.translate(W / 2 + (rand() - 0.5) * W * 0.3, H / 2 + (rand() - 0.5) * H * 0.3);
+  c.rotate(ang);
+  c.scale(s, s);
+  c.drawImage(img, -img.width / 2, -img.height / 2);
+  c.restore();
+
+  c.globalCompositeOperation = 'destination-in';
+  const kind = rand();
+  let g;
+  if(kind < 0.45){
+    // A band running with the bike, which is how kit graphics actually flow.
+    const y0 = rand() * H, y1 = y0 + (0.35 + rand() * 0.5) * H;
+    g = c.createLinearGradient(rand() * W * 0.3, y0, W - rand() * W * 0.3, y1);
+    g.addColorStop(0,    'rgba(0,0,0,0)');
+    g.addColorStop(0.28, 'rgba(0,0,0,' + (0.75 + rand() * 0.25).toFixed(3) + ')');
+    g.addColorStop(0.72, 'rgba(0,0,0,' + (0.75 + rand() * 0.25).toFixed(3) + ')');
+    g.addColorStop(1,    'rgba(0,0,0,0)');
+  } else if(kind < 0.8){
+    // A bloom, for a subject that should read as one mass rather than a stripe.
+    const cx = (0.2 + rand() * 0.6) * W, cy = (0.2 + rand() * 0.6) * H;
+    g = c.createRadialGradient(cx, cy, 0, cx, cy, (0.35 + rand() * 0.4) * W);
+    g.addColorStop(0,   'rgba(0,0,0,1)');
+    g.addColorStop(0.5, 'rgba(0,0,0,' + (0.5 + rand() * 0.35).toFixed(3) + ')');
+    g.addColorStop(1,   'rgba(0,0,0,0)');
+  } else {
+    // Occasionally let one image carry the whole sheet, so a set of uploads
+    // does not always come back as the same kind of composition.
+    g = c.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, 'rgba(0,0,0,0.95)');
+    g.addColorStop(1, 'rgba(0,0,0,0.55)');
+  }
+  c.fillStyle = g;
+  c.fillRect(0, 0, W, H);
+  return lay;
+}
+
+// Modes that keep energy. multiply and difference were tried and turned any
+// set with a dark image in it to mud.
+const BLEND_MODES = ['screen', 'overlay', 'hard-light', 'lighten', 'soft-light', 'screen'];
+
+async function blendArtwork(dataUrls, seed){
+  const rand = rng(seed);
+  const imgs = await Promise.all(dataUrls.map(loadImage));
+
+  // The sheet's own proportions, so the result is not stretched when it lands.
+  const u = kitBBox();
+  const W = 2048, H = Math.round(W * (u.h / u.w));
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const c = cv.getContext('2d');
+
+  // Base coat: the first image, covering, slightly knocked back so the layers
+  // above have somewhere to go.
+  c.fillStyle = '#0d0d10';
+  c.fillRect(0, 0, W, H);
+  const b = imgs[0];
+  const bc = Math.max(W / b.width, H / b.height);
+  c.save();
+  c.globalAlpha = 0.9;
+  c.translate(W / 2, H / 2); c.scale(bc, bc);
+  c.drawImage(b, -b.width / 2, -b.height / 2);
+  c.restore();
+
+  // Every image gets at least one pass; with only one or two uploaded, extra
+  // passes of the same picture are what make the sheet feel composed rather
+  // than cropped.
+  const passes = Math.max(imgs.length, 3) + (rand() < 0.5 ? 1 : 0);
+  for(let i = 0; i < passes; i++){
+    const img = imgs[i % imgs.length];
+    const lay = maskedLayer(img, W, H, rand);
+    c.save();
+    c.globalCompositeOperation = BLEND_MODES[Math.floor(rand() * BLEND_MODES.length)];
+    c.globalAlpha = 0.55 + rand() * 0.4;
+    c.drawImage(lay, 0, 0);
+    c.restore();
+  }
+
+  // Sweeps, in the uploads' own colours, running low-left to high-right the
+  // way the brand's does. These are what stop the result reading as a photo
+  // with effects on it and start it reading as a graphics kit.
+  const palette = imgs.flatMap(im => sampleColours(im, rand));
+  const sweeps = 2 + Math.floor(rand() * 3);
+  for(let i = 0; i < sweeps; i++){
+    const col = palette[Math.floor(rand() * palette.length)] || [255, 255, 255];
+    const y = rand() * H;
+    const thick = (0.05 + rand() * 0.16) * H;
+    const g = c.createLinearGradient(0, y + thick, W, y - thick * 2);
+    const rgb = col.join(',');
+    g.addColorStop(0,    'rgba(' + rgb + ',0)');
+    g.addColorStop(0.35, 'rgba(' + rgb + ',' + (0.35 + rand() * 0.4).toFixed(3) + ')');
+    g.addColorStop(0.65, 'rgba(' + rgb + ',' + (0.35 + rand() * 0.4).toFixed(3) + ')');
+    g.addColorStop(1,    'rgba(' + rgb + ',0)');
+    c.save();
+    c.globalCompositeOperation = rand() < 0.6 ? 'screen' : 'overlay';
+    c.translate(W / 2, H / 2);
+    c.rotate((rand() - 0.5) * 0.3);
+    c.translate(-W / 2, -H / 2);
+    c.fillStyle = g;
+    c.fillRect(-W * 0.2, y - thick, W * 1.4, thick * 2);
+    c.restore();
+  }
+
+  // Vinyl is printed, not back-lit: lift the contrast so it does not come out
+  // of the printer looking like a washed photograph.
+  const id = c.getImageData(0, 0, W, H);
+  const d = id.data;
+  for(let k = 0; k < d.length; k += 4){
+    for(let ch = 0; ch < 3; ch++){
+      const v = d[k + ch] / 255;
+      d[k + ch] = clampN(((v - 0.5) * 1.16 + 0.5) * 255, 0, 255);
+    }
+  }
+  c.putImageData(id, 0, 0);
+  return cv.toDataURL('image/jpeg', 0.9);
+}
+
 // Spread ONE copy of the image over the whole cut sheet, each panel showing
 // its own window onto it, so the design runs across the cut lines.
 //
@@ -1228,19 +1431,20 @@ function layoutAcrossKit(working){
   });
 }
 
-// Put the whole picture on each panel, centred and contained.
+// Put the picture on each panel, centred and covering it.
 //
-// Contain rather than cover: a motif that is cropped by the panel edge reads
-// as a mistake, and a customer who wants it to bleed can scale it up on that
-// panel. Each panel keeps its own scale, so the image stays as large as that
-// panel allows instead of being held to the smallest one.
+// Cover rather than contain. A contained image leaves bare plastic around
+// itself and reads as a sticker stuck on; a real kit covers the panel edge to
+// edge and takes the panel's shape. Anyone who wants the whole motif visible
+// can scale that panel down. Each panel keeps its own scale, so a long side
+// panel is not held to the size of a fork guard.
 function layoutOnEveryPanel(working){
   ZONES.forEach(z=>{
     const b = state.zoneBBox[z.id];
     if(!b) return;
     state.designs[z.id] = {
       img: working.url, natW: working.w, natH: working.h,
-      baseScale: Math.min(b.w/working.w, b.h/working.h),
+      baseScale: Math.max(b.w/working.w, b.h/working.h),
       panX: 0, panY: 0, rot: 0, scaleMult: 1,
     };
     updateOverviewZone(z.id);
@@ -1756,26 +1960,61 @@ document.getElementById('submit-btn').addEventListener('click', submitOrder);
 buildOverview();
 initMockup();
 buildPresetRow();
+// The uploads behind the current blend, so Reshuffle can recompose them
+// without asking for the files again.
+let blendSources = null;
+
+function readFile(file){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+async function runBlend(seed){
+  const msg = document.getElementById('kitwide-msg');
+  msg.style.display = 'block';
+  msg.textContent = 'Blending ' + blendSources.length + ' images\u2026';
+  // Yield once so the message paints before the blend blocks the thread.
+  await new Promise(r => setTimeout(r, 16));
+  const url = await blendArtwork(blendSources, seed);
+  await applyKitwideImage(url, 'kit');
+  document.getElementById('reshuffle').style.display = '';
+  msg.textContent = 'Blended ' + blendSources.length + ' images into one design across all '
+    + ZONES.length + ' panels (seed ' + seed + '). Reshuffle for a different composition, '
+    + 'or tap any panel to adjust it.';
+}
+
 document.getElementById('kitwide-btn').addEventListener('click', ()=>{
   const inp = document.createElement('input');
-  inp.type='file'; inp.accept='image/*';
-  inp.addEventListener('change', ()=>{
-    const file = inp.files && inp.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = (e)=>{
-      document.querySelectorAll('.preset').forEach(el=> el.classList.remove('sel'));
-      applyKitwideImage(e.target.result, 'panel');
-    };
-    reader.readAsDataURL(file);
+  inp.type='file'; inp.accept='image/*'; inp.multiple = true;
+  inp.addEventListener('change', async ()=>{
+    const files = Array.from(inp.files || []);
+    if(!files.length) return;
+    document.querySelectorAll('.preset').forEach(el=> el.classList.remove('sel'));
+    const urls = await Promise.all(files.slice(0, 8).map(readFile));
+    if(urls.length === 1){
+      blendSources = null;
+      document.getElementById('reshuffle').style.display = 'none';
+      applyKitwideImage(urls[0], 'panel');
+    } else {
+      blendSources = urls;
+      runBlend(Math.floor(Math.random() * 1e9));
+    }
   });
   inp.click();
+});
+document.getElementById('reshuffle').addEventListener('click', ()=>{
+  if(blendSources) runBlend(Math.floor(Math.random() * 1e9));
 });
 document.getElementById('layout-panel').addEventListener('click', ()=> setKitLayout('panel'));
 document.getElementById('layout-kit').addEventListener('click', ()=> setKitLayout('kit'));
 document.getElementById('kitwide-clear').addEventListener('click', ()=>{
-  kitImage = null;
+  kitImage = null; blendSources = null;
   document.getElementById('layout-row').style.display = 'none';
+  document.getElementById('reshuffle').style.display = 'none';
   clearAllPanels();
 });
 
